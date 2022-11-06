@@ -6,14 +6,16 @@
  *
  */
 
-import {
-  EXPECTED_COLOR,
-  RECEIVED_COLOR,
-  matcherHint,
-  pluralize,
-} from 'jest-matcher-utils';
+import {equals, iterableEquality, subsetEquality} from '@jest/expect-utils';
+import * as matcherUtils from 'jest-matcher-utils';
 import {getState, setState} from './jestMatchersObject';
-import type {Expect, ExpectedAssertionsErrors} from './types';
+import type {
+  Expect,
+  ExpectedAssertionsErrors,
+  MatcherContext,
+  MatcherState,
+  MatcherUtils,
+} from './types';
 
 const resetAssertionsLocalState = () => {
   setState({
@@ -23,10 +25,28 @@ const resetAssertionsLocalState = () => {
   });
 };
 
+const utils: MatcherUtils['utils'] = {
+  ...matcherUtils,
+  iterableEquality,
+  subsetEquality,
+};
+
+const matcherUtilsThing: MatcherUtils = {
+  dontThrow: () => {
+    // nothing
+  },
+  equals,
+  utils,
+};
+
 // Create and format all errors related to the mismatched number of `expect`
 // calls and reset the matcher's state.
 const extractExpectedAssertionsErrors: Expect['extractExpectedAssertionsErrors'] =
   () => {
+    const matcherContext: MatcherContext = {
+      ...getState<MatcherState>(),
+      ...matcherUtilsThing,
+    };
     const result: ExpectedAssertionsErrors = [];
     const {
       assertionCalls,
@@ -42,16 +62,21 @@ const extractExpectedAssertionsErrors: Expect['extractExpectedAssertionsErrors']
       typeof expectedAssertionsNumber === 'number' &&
       assertionCalls !== expectedAssertionsNumber
     ) {
-      const numOfAssertionsExpected = EXPECTED_COLOR(
-        pluralize('assertion', expectedAssertionsNumber),
+      const numOfAssertionsExpected = matcherContext.utils.EXPECTED_COLOR(
+        matcherContext.utils.pluralize('assertion', expectedAssertionsNumber),
       );
 
       expectedAssertionsNumberError!.message =
-        `${matcherHint('.assertions', '', expectedAssertionsNumber.toString(), {
-          isDirectExpectCall: true,
-        })}\n\n` +
-        `Expected ${numOfAssertionsExpected} to be called but received ${RECEIVED_COLOR(
-          pluralize('assertion call', assertionCalls || 0),
+        `${matcherContext.utils.matcherHint(
+          '.assertions',
+          '',
+          expectedAssertionsNumber.toString(),
+          {
+            isDirectExpectCall: true,
+          },
+        )}\n\n` +
+        `Expected ${numOfAssertionsExpected} to be called but received ${matcherContext.utils.RECEIVED_COLOR(
+          matcherContext.utils.pluralize('assertion call', assertionCalls || 0),
         )}.`;
 
       result.push({
@@ -61,10 +86,12 @@ const extractExpectedAssertionsErrors: Expect['extractExpectedAssertionsErrors']
       });
     }
     if (isExpectingAssertions && assertionCalls === 0) {
-      const expected = EXPECTED_COLOR('at least one assertion');
-      const received = RECEIVED_COLOR('received none');
+      const expected = matcherContext.utils.EXPECTED_COLOR(
+        'at least one assertion',
+      );
+      const received = matcherContext.utils.RECEIVED_COLOR('received none');
 
-      isExpectingAssertionsError!.message = `${matcherHint(
+      isExpectingAssertionsError!.message = `${matcherContext.utils.matcherHint(
         '.hasAssertions',
         '',
         '',
