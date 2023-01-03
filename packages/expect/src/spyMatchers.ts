@@ -7,21 +7,7 @@
 
 import {equals, iterableEquality} from '@jest/expect-utils';
 import {getType, isPrimitive} from 'jest-get-type';
-import {
-  DIM_COLOR,
-  EXPECTED_COLOR,
-  MatcherHintOptions,
-  RECEIVED_COLOR,
-  diff,
-  ensureExpectedIsNonNegativeInteger,
-  ensureNoExpected,
-  matcherErrorMessage,
-  matcherHint,
-  printExpected,
-  printReceived,
-  printWithType,
-  stringify,
-} from 'jest-matcher-utils';
+import type * as MatcherUtils from 'jest-matcher-utils';
 import type {
   MatcherFunction,
   MatchersObject,
@@ -35,12 +21,16 @@ const PRINT_LIMIT = 3;
 
 const NO_ARGUMENTS = 'called with 0 arguments';
 
-const printExpectedArgs = (expected: Array<unknown>): string =>
+const printExpectedArgs = (
+  utils: typeof MatcherUtils,
+  expected: Array<unknown>,
+): string =>
   expected.length === 0
     ? NO_ARGUMENTS
-    : expected.map(arg => printExpected(arg)).join(', ');
+    : expected.map(arg => utils.printExpected(arg)).join(', ');
 
 const printReceivedArgs = (
+  utils: typeof MatcherUtils,
   received: Array<unknown>,
   expected?: Array<unknown>,
 ): string =>
@@ -51,12 +41,13 @@ const printReceivedArgs = (
           Array.isArray(expected) &&
           i < expected.length &&
           isEqualValue(expected[i], arg)
-            ? printCommon(arg)
-            : printReceived(arg),
+            ? printCommon(utils, arg)
+            : utils.printReceived(arg),
         )
         .join(', ');
 
-const printCommon = (val: unknown) => DIM_COLOR(stringify(val));
+const printCommon = (utils: typeof MatcherUtils, val: unknown) =>
+  utils.DIM_COLOR(utils.stringify(val));
 
 const isEqualValue = (expected: unknown, received: unknown): boolean =>
   equals(expected, received, [iterableEquality]);
@@ -77,12 +68,13 @@ const countReturns = (results: Array<any>): number =>
   );
 
 const printNumberOfReturns = (
+  utils: typeof MatcherUtils,
   countReturns: number,
   countCalls: number,
 ): string =>
-  `\nNumber of returns: ${printReceived(countReturns)}${
+  `\nNumber of returns: ${utils.printReceived(countReturns)}${
     countCalls !== countReturns
-      ? `\nNumber of calls:   ${printReceived(countCalls)}`
+      ? `\nNumber of calls:   ${utils.printReceived(countCalls)}`
       : ''
   }`;
 
@@ -106,6 +98,7 @@ const getRightAlignedPrinter = (label: string): PrintLabel => {
 type IndexedCall = [number, Array<unknown>];
 
 const printReceivedCallsNegative = (
+  utils: typeof MatcherUtils,
   expected: Array<unknown>,
   indexedCalls: Array<IndexedCall>,
   isOnlyCall: boolean,
@@ -117,7 +110,7 @@ const printReceivedCallsNegative = (
 
   const label = 'Received:     ';
   if (isOnlyCall) {
-    return `${label + printReceivedArgs(indexedCalls[0], expected)}\n`;
+    return `${label + printReceivedArgs(utils, indexedCalls[0], expected)}\n`;
   }
 
   const printAligned = getRightAlignedPrinter(label);
@@ -127,20 +120,21 @@ const printReceivedCallsNegative = (
       `${
         printed +
         printAligned(String(i + 1), i === iExpectedCall) +
-        printReceivedArgs(args, expected)
+        printReceivedArgs(utils, args, expected)
       }\n`,
     '',
   )}`;
 };
 
 const printExpectedReceivedCallsPositive = (
+  utils: typeof MatcherUtils,
   expected: Array<unknown>,
   indexedCalls: Array<IndexedCall>,
   expand: boolean,
   isOnlyCall: boolean,
   iExpectedCall?: number,
 ) => {
-  const expectedLine = `Expected: ${printExpectedArgs(expected)}\n`;
+  const expectedLine = `Expected: ${printExpectedArgs(utils, expected)}\n`;
   if (indexedCalls.length === 0) {
     return expectedLine;
   }
@@ -152,8 +146,8 @@ const printExpectedReceivedCallsPositive = (
     if (isLineDiffableCall(expected, received)) {
       // Display diff without indentation.
       const lines = [
-        EXPECTED_COLOR('- Expected'),
-        RECEIVED_COLOR('+ Received'),
+        utils.EXPECTED_COLOR('- Expected'),
+        utils.RECEIVED_COLOR('+ Received'),
         '',
       ];
 
@@ -161,12 +155,12 @@ const printExpectedReceivedCallsPositive = (
       for (let i = 0; i < length; i += 1) {
         if (i < expected.length && i < received.length) {
           if (isEqualValue(expected[i], received[i])) {
-            lines.push(`  ${printCommon(received[i])},`);
+            lines.push(`  ${printCommon(utils, received[i])},`);
             continue;
           }
 
           if (isLineDiffableArg(expected[i], received[i])) {
-            const difference = diff(expected[i], received[i], {expand});
+            const difference = utils.diff(expected[i], received[i], {expand});
             if (
               typeof difference === 'string' &&
               difference.includes('- Expected') &&
@@ -180,17 +174,23 @@ const printExpectedReceivedCallsPositive = (
         }
 
         if (i < expected.length) {
-          lines.push(`${EXPECTED_COLOR(`- ${stringify(expected[i])}`)},`);
+          lines.push(
+            `${utils.EXPECTED_COLOR(`- ${utils.stringify(expected[i])}`)},`,
+          );
         }
         if (i < received.length) {
-          lines.push(`${RECEIVED_COLOR(`+ ${stringify(received[i])}`)},`);
+          lines.push(
+            `${utils.RECEIVED_COLOR(`+ ${utils.stringify(received[i])}`)},`,
+          );
         }
       }
 
       return `${lines.join('\n')}\n`;
     }
 
-    return `${expectedLine + label + printReceivedArgs(received, expected)}\n`;
+    return `${
+      expectedLine + label + printReceivedArgs(utils, received, expected)
+    }\n`;
   }
 
   const printAligned = getRightAlignedPrinter(label);
@@ -206,8 +206,8 @@ const printExpectedReceivedCallsPositive = (
         ((i === iExpectedCall || iExpectedCall === undefined) &&
         isLineDiffableCall(expected, received)
           ? aligned.replace(': ', '\n') +
-            printDiffCall(expected, received, expand)
-          : aligned + printReceivedArgs(received, expected))
+            printDiffCall(utils, expected, received, expand)
+          : aligned + printReceivedArgs(utils, received, expected))
       }\n`;
     }, '')
   );
@@ -216,6 +216,7 @@ const printExpectedReceivedCallsPositive = (
 const indentation = 'Received'.replace(/\w/g, ' ');
 
 const printDiffCall = (
+  utils: typeof MatcherUtils,
   expected: Array<unknown>,
   received: Array<unknown>,
   expand: boolean,
@@ -224,11 +225,11 @@ const printDiffCall = (
     .map((arg, i) => {
       if (i < expected.length) {
         if (isEqualValue(expected[i], arg)) {
-          return `${indentation}  ${printCommon(arg)},`;
+          return `${indentation}  ${printCommon(utils, arg)},`;
         }
 
         if (isLineDiffableArg(expected[i], arg)) {
-          const difference = diff(expected[i], arg, {expand});
+          const difference = utils.diff(expected[i], arg, {expand});
 
           if (
             typeof difference === 'string' &&
@@ -250,8 +251,8 @@ const printDiffCall = (
       return `${
         indentation +
         (i < expected.length
-          ? `  ${printReceived(arg)}`
-          : RECEIVED_COLOR(`+ ${stringify(arg)}`))
+          ? `  ${utils.printReceived(arg)}`
+          : utils.RECEIVED_COLOR(`+ ${utils.stringify(arg)}`))
       },`;
     })
     .join('\n');
@@ -307,20 +308,25 @@ const isLineDiffableArg = (expected: unknown, received: unknown): boolean => {
   return true;
 };
 
-const printResult = (result: any, expected: unknown) =>
+const printResult = (
+  utils: typeof MatcherUtils,
+  result: any,
+  expected: unknown,
+) =>
   result.type === 'throw'
     ? 'function call threw an error'
     : result.type === 'incomplete'
     ? 'function call has not returned yet'
     : isEqualValue(expected, result.value)
-    ? printCommon(result.value)
-    : printReceived(result.value);
+    ? printCommon(utils, result.value)
+    : utils.printReceived(result.value);
 
 type IndexedResult = [number, any];
 
 // Return either empty string or one line per indexed result,
 // so additional empty line can separate from `Number of returns` which follows.
 const printReceivedResults = (
+  utils: typeof MatcherUtils,
   label: string,
   expected: unknown,
   indexedResults: Array<IndexedResult>,
@@ -332,7 +338,7 @@ const printReceivedResults = (
   }
 
   if (isOnlyCall && (iExpectedCall === 0 || iExpectedCall === undefined)) {
-    return `${label + printResult(indexedResults[0][1], expected)}\n`;
+    return `${label + printResult(utils, indexedResults[0][1], expected)}\n`;
   }
 
   const printAligned = getRightAlignedPrinter(label);
@@ -346,7 +352,7 @@ const printReceivedResults = (
         `${
           printed +
           printAligned(String(i + 1), i === iExpectedCall) +
-          printResult(result, expected)
+          printResult(utils, result, expected)
         }\n`,
       '',
     )
@@ -356,14 +362,20 @@ const printReceivedResults = (
 const createToBeCalledMatcher = (
   matcherName: string,
 ): MatcherFunction<[unknown]> =>
-  function (received: any, expected: unknown): SyncExpectationResult {
+  function (received: any, expected): SyncExpectationResult {
     const expectedArgument = '';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureNoExpected(expected, matcherName, options);
-    ensureMockOrSpy(received, matcherName, expectedArgument, options);
+    this.utils.ensureNoExpected(expected, matcherName, options);
+    ensureMockOrSpy(
+      this.utils,
+      received,
+      matcherName,
+      expectedArgument,
+      options,
+    );
 
     const receivedIsSpy = isSpy(received);
     const receivedName = receivedIsSpy ? 'spy' : received.getMockName();
@@ -377,14 +389,19 @@ const createToBeCalledMatcher = (
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, receivedName, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            receivedName,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected number of calls: ${printExpected(0)}\n` +
-          `Received number of calls: ${printReceived(count)}\n\n` +
+          `Expected number of calls: ${this.utils.printExpected(0)}\n` +
+          `Received number of calls: ${this.utils.printReceived(count)}\n\n` +
           calls
             .reduce((lines: Array<string>, args: any, i: number) => {
               if (lines.length < PRINT_LIMIT) {
-                lines.push(`${i + 1}: ${printReceivedArgs(args)}`);
+                lines.push(`${i + 1}: ${printReceivedArgs(this.utils, args)}`);
               }
 
               return lines;
@@ -392,10 +409,15 @@ const createToBeCalledMatcher = (
             .join('\n')
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, receivedName, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            receivedName,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected number of calls: >= ${printExpected(1)}\n` +
-          `Received number of calls:    ${printReceived(count)}`;
+          `Expected number of calls: >= ${this.utils.printExpected(1)}\n` +
+          `Received number of calls:    ${this.utils.printReceived(count)}`;
 
     return {message, pass};
   };
@@ -405,12 +427,12 @@ const createToReturnMatcher = (
 ): MatcherFunction<[unknown]> =>
   function (received: any, expected): SyncExpectationResult {
     const expectedArgument = '';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureNoExpected(expected, matcherName, options);
-    ensureMock(received, matcherName, expectedArgument, options);
+    this.utils.ensureNoExpected(expected, matcherName, options);
+    ensureMock(this.utils, received, matcherName, expectedArgument, options);
 
     const receivedName = received.getMockName();
 
@@ -425,32 +447,44 @@ const createToReturnMatcher = (
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, receivedName, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            receivedName,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected number of returns: ${printExpected(0)}\n` +
-          `Received number of returns: ${printReceived(count)}\n\n` +
+          `Expected number of returns: ${this.utils.printExpected(0)}\n` +
+          `Received number of returns: ${this.utils.printReceived(count)}\n\n` +
           received.mock.results
             .reduce((lines: Array<string>, result: any, i: number) => {
               if (result.type === 'return' && lines.length < PRINT_LIMIT) {
-                lines.push(`${i + 1}: ${printReceived(result.value)}`);
+                lines.push(
+                  `${i + 1}: ${this.utils.printReceived(result.value)}`,
+                );
               }
 
               return lines;
             }, [])
             .join('\n') +
           (received.mock.calls.length !== count
-            ? `\n\nReceived number of calls:   ${printReceived(
+            ? `\n\nReceived number of calls:   ${this.utils.printReceived(
                 received.mock.calls.length,
               )}`
             : '')
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, receivedName, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            receivedName,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected number of returns: >= ${printExpected(1)}\n` +
-          `Received number of returns:    ${printReceived(count)}` +
+          `Expected number of returns: >= ${this.utils.printExpected(1)}\n` +
+          `Received number of returns:    ${this.utils.printReceived(count)}` +
           (received.mock.calls.length !== count
-            ? `\nReceived number of calls:      ${printReceived(
+            ? `\nReceived number of calls:      ${this.utils.printReceived(
                 received.mock.calls.length,
               )}`
             : '');
@@ -463,12 +497,22 @@ const createToBeCalledTimesMatcher = (
 ): MatcherFunction<[number]> =>
   function (received: any, expected): SyncExpectationResult {
     const expectedArgument = 'expected';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureExpectedIsNonNegativeInteger(expected, matcherName, options);
-    ensureMockOrSpy(received, matcherName, expectedArgument, options);
+    this.utils.ensureExpectedIsNonNegativeInteger(
+      expected,
+      matcherName,
+      options,
+    );
+    ensureMockOrSpy(
+      this.utils,
+      received,
+      matcherName,
+      expectedArgument,
+      options,
+    );
 
     const receivedIsSpy = isSpy(received);
     const receivedName = receivedIsSpy ? 'spy' : received.getMockName();
@@ -481,15 +525,25 @@ const createToBeCalledTimesMatcher = (
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, receivedName, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            receivedName,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected number of calls: not ${printExpected(expected)}`
+          `Expected number of calls: not ${this.utils.printExpected(expected)}`
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, receivedName, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            receivedName,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected number of calls: ${printExpected(expected)}\n` +
-          `Received number of calls: ${printReceived(count)}`;
+          `Expected number of calls: ${this.utils.printExpected(expected)}\n` +
+          `Received number of calls: ${this.utils.printReceived(count)}`;
 
     return {message, pass};
   };
@@ -499,12 +553,16 @@ const createToReturnTimesMatcher = (
 ): MatcherFunction<[number]> =>
   function (received: any, expected): SyncExpectationResult {
     const expectedArgument = 'expected';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureExpectedIsNonNegativeInteger(expected, matcherName, options);
-    ensureMock(received, matcherName, expectedArgument, options);
+    this.utils.ensureExpectedIsNonNegativeInteger(
+      expected,
+      matcherName,
+      options,
+    );
+    ensureMock(this.utils, received, matcherName, expectedArgument, options);
 
     const receivedName = received.getMockName();
 
@@ -519,22 +577,36 @@ const createToReturnTimesMatcher = (
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, receivedName, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            receivedName,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected number of returns: not ${printExpected(expected)}` +
+          `Expected number of returns: not ${this.utils.printExpected(
+            expected,
+          )}` +
           (received.mock.calls.length !== count
-            ? `\n\nReceived number of calls:       ${printReceived(
+            ? `\n\nReceived number of calls:       ${this.utils.printReceived(
                 received.mock.calls.length,
               )}`
             : '')
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, receivedName, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            receivedName,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected number of returns: ${printExpected(expected)}\n` +
-          `Received number of returns: ${printReceived(count)}` +
+          `Expected number of returns: ${this.utils.printExpected(
+            expected,
+          )}\n` +
+          `Received number of returns: ${this.utils.printReceived(count)}` +
           (received.mock.calls.length !== count
-            ? `\nReceived number of calls:   ${printReceived(
+            ? `\nReceived number of calls:   ${this.utils.printReceived(
                 received.mock.calls.length,
               )}`
             : '');
@@ -547,11 +619,17 @@ const createToBeCalledWithMatcher = (
 ): MatcherFunction<Array<unknown>> =>
   function (received: any, ...expected): SyncExpectationResult {
     const expectedArgument = '...expected';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureMockOrSpy(received, matcherName, expectedArgument, options);
+    ensureMockOrSpy(
+      this.utils,
+      received,
+      matcherName,
+      expectedArgument,
+      options,
+    );
 
     const receivedIsSpy = isSpy(received);
     const receivedName = receivedIsSpy ? 'spy' : received.getMockName();
@@ -576,17 +654,24 @@ const createToBeCalledWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
-            `Expected: not ${printExpectedArgs(expected)}\n` +
-            (calls.length === 1 && stringify(calls[0]) === stringify(expected)
+            `Expected: not ${printExpectedArgs(this.utils, expected)}\n` +
+            (calls.length === 1 &&
+            this.utils.stringify(calls[0]) === this.utils.stringify(expected)
               ? ''
               : printReceivedCallsNegative(
+                  this.utils,
                   expected,
                   indexedCalls,
                   calls.length === 1,
                 )) +
-            `\nNumber of calls: ${printReceived(calls.length)}`
+            `\nNumber of calls: ${this.utils.printReceived(calls.length)}`
           );
         }
       : () => {
@@ -600,15 +685,21 @@ const createToBeCalledWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
             printExpectedReceivedCallsPositive(
+              this.utils,
               expected,
               indexedCalls,
               isExpand(this.expand),
               calls.length === 1,
             ) +
-            `\nNumber of calls: ${printReceived(calls.length)}`
+            `\nNumber of calls: ${this.utils.printReceived(calls.length)}`
           );
         };
 
@@ -620,11 +711,11 @@ const createToReturnWithMatcher = (
 ): MatcherFunction<[unknown]> =>
   function (received: any, expected): SyncExpectationResult {
     const expectedArgument = 'expected';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureMock(received, matcherName, expectedArgument, options);
+    ensureMock(this.utils, received, matcherName, expectedArgument, options);
 
     const receivedName = received.getMockName();
     const {calls, results} = received.mock;
@@ -645,20 +736,31 @@ const createToReturnWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
-            `Expected: not ${printExpected(expected)}\n` +
+            `Expected: not ${this.utils.printExpected(expected)}\n` +
             (results.length === 1 &&
             results[0].type === 'return' &&
-            stringify(results[0].value) === stringify(expected)
+            this.utils.stringify(results[0].value) ===
+              this.utils.stringify(expected)
               ? ''
               : printReceivedResults(
+                  this.utils,
                   'Received:     ',
                   expected,
                   indexedResults,
                   results.length === 1,
                 )) +
-            printNumberOfReturns(countReturns(results), calls.length)
+            printNumberOfReturns(
+              this.utils,
+              countReturns(results),
+              calls.length,
+            )
           );
         }
       : () => {
@@ -672,16 +774,26 @@ const createToReturnWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
-            `Expected: ${printExpected(expected)}\n` +
+            `Expected: ${this.utils.printExpected(expected)}\n` +
             printReceivedResults(
+              this.utils,
               'Received: ',
               expected,
               indexedResults,
               results.length === 1,
             ) +
-            printNumberOfReturns(countReturns(results), calls.length)
+            printNumberOfReturns(
+              this.utils,
+              countReturns(results),
+              calls.length,
+            )
           );
         };
 
@@ -693,11 +805,17 @@ const createLastCalledWithMatcher = (
 ): MatcherFunction<Array<unknown>> =>
   function (received: any, ...expected): SyncExpectationResult {
     const expectedArgument = '...expected';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureMockOrSpy(received, matcherName, expectedArgument, options);
+    ensureMockOrSpy(
+      this.utils,
+      received,
+      matcherName,
+      expectedArgument,
+      options,
+    );
 
     const receivedIsSpy = isSpy(received);
     const receivedName = receivedIsSpy ? 'spy' : received.getMockName();
@@ -720,18 +838,25 @@ const createLastCalledWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
-            `Expected: not ${printExpectedArgs(expected)}\n` +
-            (calls.length === 1 && stringify(calls[0]) === stringify(expected)
+            `Expected: not ${printExpectedArgs(this.utils, expected)}\n` +
+            (calls.length === 1 &&
+            this.utils.stringify(calls[0]) === this.utils.stringify(expected)
               ? ''
               : printReceivedCallsNegative(
+                  this.utils,
                   expected,
                   indexedCalls,
                   calls.length === 1,
                   iLast,
                 )) +
-            `\nNumber of calls: ${printReceived(calls.length)}`
+            `\nNumber of calls: ${this.utils.printReceived(calls.length)}`
           );
         }
       : () => {
@@ -755,16 +880,22 @@ const createLastCalledWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
             printExpectedReceivedCallsPositive(
+              this.utils,
               expected,
               indexedCalls,
               isExpand(this.expand),
               calls.length === 1,
               iLast,
             ) +
-            `\nNumber of calls: ${printReceived(calls.length)}`
+            `\nNumber of calls: ${this.utils.printReceived(calls.length)}`
           );
         };
 
@@ -776,11 +907,11 @@ const createLastReturnedMatcher = (
 ): MatcherFunction<[unknown]> =>
   function (received: any, expected): SyncExpectationResult {
     const expectedArgument = 'expected';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureMock(received, matcherName, expectedArgument, options);
+    ensureMock(this.utils, received, matcherName, expectedArgument, options);
 
     const receivedName = received.getMockName();
 
@@ -800,21 +931,32 @@ const createLastReturnedMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
-            `Expected: not ${printExpected(expected)}\n` +
+            `Expected: not ${this.utils.printExpected(expected)}\n` +
             (results.length === 1 &&
             results[0].type === 'return' &&
-            stringify(results[0].value) === stringify(expected)
+            this.utils.stringify(results[0].value) ===
+              this.utils.stringify(expected)
               ? ''
               : printReceivedResults(
+                  this.utils,
                   'Received:     ',
                   expected,
                   indexedResults,
                   results.length === 1,
                   iLast,
                 )) +
-            printNumberOfReturns(countReturns(results), calls.length)
+            printNumberOfReturns(
+              this.utils,
+              countReturns(results),
+              calls.length,
+            )
           );
         }
       : () => {
@@ -838,17 +980,27 @@ const createLastReturnedMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
-            `Expected: ${printExpected(expected)}\n` +
+            `Expected: ${this.utils.printExpected(expected)}\n` +
             printReceivedResults(
+              this.utils,
               'Received: ',
               expected,
               indexedResults,
               results.length === 1,
               iLast,
             ) +
-            printNumberOfReturns(countReturns(results), calls.length)
+            printNumberOfReturns(
+              this.utils,
+              countReturns(results),
+              calls.length,
+            )
           );
         };
 
@@ -860,20 +1012,31 @@ const createNthCalledWithMatcher = (
 ): MatcherFunction<[number, ...Array<unknown>]> =>
   function (received: any, nth, ...expected): SyncExpectationResult {
     const expectedArgument = 'n';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       expectedColor: (arg: string) => arg,
       isNot: this.isNot,
       promise: this.promise,
       secondArgument: '...expected',
     };
-    ensureMockOrSpy(received, matcherName, expectedArgument, options);
+    ensureMockOrSpy(
+      this.utils,
+      received,
+      matcherName,
+      expectedArgument,
+      options,
+    );
 
     if (!Number.isSafeInteger(nth) || nth < 1) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, expectedArgument, options),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(
+            matcherName,
+            undefined,
+            expectedArgument,
+            options,
+          ),
           `${expectedArgument} must be a positive integer`,
-          printWithType(expectedArgument, nth, stringify),
+          this.utils.printWithType(expectedArgument, nth, this.utils.stringify),
         ),
       );
     }
@@ -904,19 +1067,26 @@ const createNthCalledWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
             `n: ${nth}\n` +
-            `Expected: not ${printExpectedArgs(expected)}\n` +
-            (calls.length === 1 && stringify(calls[0]) === stringify(expected)
+            `Expected: not ${printExpectedArgs(this.utils, expected)}\n` +
+            (calls.length === 1 &&
+            this.utils.stringify(calls[0]) === this.utils.stringify(expected)
               ? ''
               : printReceivedCallsNegative(
+                  this.utils,
                   expected,
                   indexedCalls,
                   calls.length === 1,
                   iNth,
                 )) +
-            `\nNumber of calls: ${printReceived(calls.length)}`
+            `\nNumber of calls: ${this.utils.printReceived(calls.length)}`
           );
         }
       : () => {
@@ -967,17 +1137,23 @@ const createNthCalledWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
             `n: ${nth}\n` +
             printExpectedReceivedCallsPositive(
+              this.utils,
               expected,
               indexedCalls,
               isExpand(this.expand),
               calls.length === 1,
               iNth,
             ) +
-            `\nNumber of calls: ${printReceived(calls.length)}`
+            `\nNumber of calls: ${this.utils.printReceived(calls.length)}`
           );
         };
 
@@ -989,20 +1165,24 @@ const createNthReturnedWithMatcher = (
 ): MatcherFunction<[number, unknown]> =>
   function (received: any, nth, expected): SyncExpectationResult {
     const expectedArgument = 'n';
-    const options: MatcherHintOptions = {
+    const options: MatcherUtils.MatcherHintOptions = {
       expectedColor: (arg: string) => arg,
       isNot: this.isNot,
       promise: this.promise,
       secondArgument: 'expected',
     };
-    ensureMock(received, matcherName, expectedArgument, options);
-
+    ensureMock(this.utils, received, matcherName, expectedArgument, options);
     if (!Number.isSafeInteger(nth) || nth < 1) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, expectedArgument, options),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(
+            matcherName,
+            undefined,
+            expectedArgument,
+            options,
+          ),
           `${expectedArgument} must be a positive integer`,
-          printWithType(expectedArgument, nth, stringify),
+          this.utils.printWithType(expectedArgument, nth, this.utils.stringify),
         ),
       );
     }
@@ -1029,22 +1209,33 @@ const createNthReturnedWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
             `n: ${nth}\n` +
-            `Expected: not ${printExpected(expected)}\n` +
+            `Expected: not ${this.utils.printExpected(expected)}\n` +
             (results.length === 1 &&
             results[0].type === 'return' &&
-            stringify(results[0].value) === stringify(expected)
+            this.utils.stringify(results[0].value) ===
+              this.utils.stringify(expected)
               ? ''
               : printReceivedResults(
+                  this.utils,
                   'Received:     ',
                   expected,
                   indexedResults,
                   results.length === 1,
                   iNth,
                 )) +
-            printNumberOfReturns(countReturns(results), calls.length)
+            printNumberOfReturns(
+              this.utils,
+              countReturns(results),
+              calls.length,
+            )
           );
         }
       : () => {
@@ -1095,18 +1286,28 @@ const createNthReturnedWithMatcher = (
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, receivedName, expectedArgument, options) +
+            this.utils.matcherHint(
+              matcherName,
+              receivedName,
+              expectedArgument,
+              options,
+            ) +
             '\n\n' +
             `n: ${nth}\n` +
-            `Expected: ${printExpected(expected)}\n` +
+            `Expected: ${this.utils.printExpected(expected)}\n` +
             printReceivedResults(
+              this.utils,
               'Received: ',
               expected,
               indexedResults,
               results.length === 1,
               iNth,
             ) +
-            printNumberOfReturns(countReturns(results), calls.length)
+            printNumberOfReturns(
+              this.utils,
+              countReturns(results),
+              calls.length,
+            )
           );
         };
 
@@ -1150,34 +1351,38 @@ const isSpy = (received: any) =>
   typeof received.calls.count === 'function';
 
 const ensureMockOrSpy = (
+  utils: typeof MatcherUtils,
   received: any,
   matcherName: string,
   expectedArgument: string,
-  options: MatcherHintOptions,
+  options: MatcherUtils.MatcherHintOptions,
 ) => {
   if (!isMock(received) && !isSpy(received)) {
     throw new Error(
-      matcherErrorMessage(
-        matcherHint(matcherName, undefined, expectedArgument, options),
-        `${RECEIVED_COLOR('received')} value must be a mock or spy function`,
-        printWithType('Received', received, printReceived),
+      utils.matcherErrorMessage(
+        utils.matcherHint(matcherName, undefined, expectedArgument, options),
+        `${utils.RECEIVED_COLOR(
+          'received',
+        )} value must be a mock or spy function`,
+        utils.printWithType('Received', received, utils.printReceived),
       ),
     );
   }
 };
 
 const ensureMock = (
+  utils: typeof MatcherUtils,
   received: any,
   matcherName: string,
   expectedArgument: string,
-  options: MatcherHintOptions,
+  options: MatcherUtils.MatcherHintOptions,
 ) => {
   if (!isMock(received)) {
     throw new Error(
-      matcherErrorMessage(
-        matcherHint(matcherName, undefined, expectedArgument, options),
-        `${RECEIVED_COLOR('received')} value must be a mock function`,
-        printWithType('Received', received, printReceived),
+      utils.matcherErrorMessage(
+        utils.matcherHint(matcherName, undefined, expectedArgument, options),
+        `${utils.RECEIVED_COLOR('received')} value must be a mock function`,
+        utils.printWithType('Received', received, utils.printReceived),
       ),
     );
   }

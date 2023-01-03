@@ -20,24 +20,7 @@ import {
   typeEquality,
 } from '@jest/expect-utils';
 import {getType, isPrimitive} from 'jest-get-type';
-import {
-  DIM_COLOR,
-  EXPECTED_COLOR,
-  MatcherHintOptions,
-  RECEIVED_COLOR,
-  SUGGEST_TO_CONTAIN_EQUAL,
-  ensureExpectedIsNonNegativeInteger,
-  ensureNoExpected,
-  ensureNumbers,
-  getLabelPrinter,
-  matcherErrorMessage,
-  matcherHint,
-  printDiffOrStringify,
-  printExpected,
-  printReceived,
-  printWithType,
-  stringify,
-} from 'jest-matcher-utils';
+import type {MatcherHintOptions} from 'jest-matcher-utils';
 import {
   printCloseTo,
   printExpectedConstructorName,
@@ -87,9 +70,9 @@ const matchers: MatchersObject = {
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          `Expected: not ${printExpected(expected)}`
+          `Expected: not ${this.utils.printExpected(expected)}`
       : () => {
           const expectedType = getType(expected);
 
@@ -106,14 +89,14 @@ const matchers: MatchersObject = {
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, undefined, undefined, options) +
+            this.utils.matcherHint(matcherName, undefined, undefined, options) +
             '\n\n' +
             (deepEqualityName !== null
-              ? `${DIM_COLOR(
+              ? `${this.utils.DIM_COLOR(
                   `If it should pass with deep equality, replace "${matcherName}" with "${deepEqualityName}"`,
                 )}\n\n`
               : '') +
-            printDiffOrStringify(
+            this.utils.printDiffOrStringify(
               expected,
               received,
               EXPECTED_LABEL,
@@ -142,20 +125,28 @@ const matchers: MatchersObject = {
 
     if (typeof expected !== 'number') {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${EXPECTED_COLOR('expected')} value must be a number`,
-          printWithType('Expected', expected, printExpected),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.EXPECTED_COLOR('expected')} value must be a number`,
+          this.utils.printWithType(
+            'Expected',
+            expected,
+            this.utils.printExpected,
+          ),
         ),
       );
     }
 
     if (typeof received !== 'number') {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${RECEIVED_COLOR('received')} value must be a number`,
-          printWithType('Received', received, printReceived),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.RECEIVED_COLOR('received')} value must be a number`,
+          this.utils.printWithType(
+            'Received',
+            received,
+            this.utils.printReceived,
+          ),
         ),
       );
     }
@@ -177,19 +168,19 @@ const matchers: MatchersObject = {
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          `Expected: not ${printExpected(expected)}\n` +
+          `Expected: not ${this.utils.printExpected(expected)}\n` +
           (receivedDiff === 0
             ? ''
-            : `Received:     ${printReceived(received)}\n` +
+            : `Received:     ${this.utils.printReceived(received)}\n` +
               `\n${printCloseTo(receivedDiff, expectedDiff, precision, isNot)}`)
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          `Expected: ${printExpected(expected)}\n` +
-          `Received: ${printReceived(received)}\n` +
+          `Expected: ${this.utils.printExpected(expected)}\n` +
+          `Received: ${this.utils.printReceived(received)}\n` +
           '\n' +
           printCloseTo(receivedDiff, expectedDiff, precision, isNot);
 
@@ -202,15 +193,15 @@ const matchers: MatchersObject = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureNoExpected(expected, matcherName, options);
+    this.utils.ensureNoExpected(expected, matcherName, options);
 
     const pass = received !== void 0;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, '', options) +
+      this.utils.matcherHint(matcherName, undefined, '', options) +
       '\n\n' +
-      `Received: ${printReceived(received)}`;
+      `Received: ${this.utils.printReceived(received)}`;
 
     return {message, pass};
   },
@@ -221,15 +212,15 @@ const matchers: MatchersObject = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureNoExpected(expected, matcherName, options);
+    this.utils.ensureNoExpected(expected, matcherName, options);
 
     const pass = !received;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, '', options) +
+      this.utils.matcherHint(matcherName, undefined, '', options) +
       '\n\n' +
-      `Received: ${printReceived(received)}`;
+      `Received: ${this.utils.printReceived(received)}`;
 
     return {message, pass};
   },
@@ -241,16 +232,18 @@ const matchers: MatchersObject = {
       isNot,
       promise: this.promise,
     };
-    ensureNumbers(received, expected, matcherName, options);
+    this.utils.ensureNumbers(received, expected, matcherName, options);
 
     const pass = received > expected;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, undefined, options) +
+      this.utils.matcherHint(matcherName, undefined, undefined, options) +
       '\n\n' +
-      `Expected:${isNot ? ' not' : ''} > ${printExpected(expected)}\n` +
-      `Received:${isNot ? '    ' : ''}   ${printReceived(received)}`;
+      `Expected:${isNot ? ' not' : ''} > ${this.utils.printExpected(
+        expected,
+      )}\n` +
+      `Received:${isNot ? '    ' : ''}   ${this.utils.printReceived(received)}`;
 
     return {message, pass};
   },
@@ -262,16 +255,20 @@ const matchers: MatchersObject = {
       isNot,
       promise: this.promise,
     };
-    ensureNumbers(received, expected, matcherName, options);
+    this.utils.ensureNumbers(received, expected, matcherName, options);
 
     const pass = received >= expected;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, undefined, options) +
+      this.utils.matcherHint(matcherName, undefined, undefined, options) +
       '\n\n' +
-      `Expected:${isNot ? ' not' : ''} >= ${printExpected(expected)}\n` +
-      `Received:${isNot ? '    ' : ''}    ${printReceived(received)}`;
+      `Expected:${isNot ? ' not' : ''} >= ${this.utils.printExpected(
+        expected,
+      )}\n` +
+      `Received:${isNot ? '    ' : ''}    ${this.utils.printReceived(
+        received,
+      )}`;
 
     return {message, pass};
   },
@@ -285,10 +282,14 @@ const matchers: MatchersObject = {
 
     if (typeof expected !== 'function') {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${EXPECTED_COLOR('expected')} value must be a function`,
-          printWithType('Expected', expected, printExpected),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.EXPECTED_COLOR('expected')} value must be a function`,
+          this.utils.printWithType(
+            'Expected',
+            expected,
+            this.utils.printExpected,
+          ),
         ),
       );
     }
@@ -298,7 +299,7 @@ const matchers: MatchersObject = {
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
           printExpectedConstructorNameNot('Expected constructor', expected) +
           (typeof received.constructor === 'function' &&
@@ -311,15 +312,15 @@ const matchers: MatchersObject = {
             : '')
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
           printExpectedConstructorName('Expected constructor', expected) +
           (isPrimitive(received) || Object.getPrototypeOf(received) === null
-            ? `\nReceived value has no prototype\nReceived value: ${printReceived(
+            ? `\nReceived value has no prototype\nReceived value: ${this.utils.printReceived(
                 received,
               )}`
             : typeof received.constructor !== 'function'
-            ? `\nReceived value: ${printReceived(received)}`
+            ? `\nReceived value: ${this.utils.printReceived(received)}`
             : printReceivedConstructorName(
                 'Received constructor',
                 received.constructor,
@@ -335,16 +336,18 @@ const matchers: MatchersObject = {
       isNot,
       promise: this.promise,
     };
-    ensureNumbers(received, expected, matcherName, options);
+    this.utils.ensureNumbers(received, expected, matcherName, options);
 
     const pass = received < expected;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, undefined, options) +
+      this.utils.matcherHint(matcherName, undefined, undefined, options) +
       '\n\n' +
-      `Expected:${isNot ? ' not' : ''} < ${printExpected(expected)}\n` +
-      `Received:${isNot ? '    ' : ''}   ${printReceived(received)}`;
+      `Expected:${isNot ? ' not' : ''} < ${this.utils.printExpected(
+        expected,
+      )}\n` +
+      `Received:${isNot ? '    ' : ''}   ${this.utils.printReceived(received)}`;
 
     return {message, pass};
   },
@@ -356,16 +359,20 @@ const matchers: MatchersObject = {
       isNot,
       promise: this.promise,
     };
-    ensureNumbers(received, expected, matcherName, options);
+    this.utils.ensureNumbers(received, expected, matcherName, options);
 
     const pass = received <= expected;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, undefined, options) +
+      this.utils.matcherHint(matcherName, undefined, undefined, options) +
       '\n\n' +
-      `Expected:${isNot ? ' not' : ''} <= ${printExpected(expected)}\n` +
-      `Received:${isNot ? '    ' : ''}    ${printReceived(received)}`;
+      `Expected:${isNot ? ' not' : ''} <= ${this.utils.printExpected(
+        expected,
+      )}\n` +
+      `Received:${isNot ? '    ' : ''}    ${this.utils.printReceived(
+        received,
+      )}`;
 
     return {message, pass};
   },
@@ -376,15 +383,15 @@ const matchers: MatchersObject = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureNoExpected(expected, matcherName, options);
+    this.utils.ensureNoExpected(expected, matcherName, options);
 
     const pass = Number.isNaN(received);
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, '', options) +
+      this.utils.matcherHint(matcherName, undefined, '', options) +
       '\n\n' +
-      `Received: ${printReceived(received)}`;
+      `Received: ${this.utils.printReceived(received)}`;
 
     return {message, pass};
   },
@@ -395,15 +402,15 @@ const matchers: MatchersObject = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureNoExpected(expected, matcherName, options);
+    this.utils.ensureNoExpected(expected, matcherName, options);
 
     const pass = received === null;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, '', options) +
+      this.utils.matcherHint(matcherName, undefined, '', options) +
       '\n\n' +
-      `Received: ${printReceived(received)}`;
+      `Received: ${this.utils.printReceived(received)}`;
 
     return {message, pass};
   },
@@ -414,15 +421,15 @@ const matchers: MatchersObject = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureNoExpected(expected, matcherName, options);
+    this.utils.ensureNoExpected(expected, matcherName, options);
 
     const pass = !!received;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, '', options) +
+      this.utils.matcherHint(matcherName, undefined, '', options) +
       '\n\n' +
-      `Received: ${printReceived(received)}`;
+      `Received: ${this.utils.printReceived(received)}`;
 
     return {message, pass};
   },
@@ -433,15 +440,15 @@ const matchers: MatchersObject = {
       isNot: this.isNot,
       promise: this.promise,
     };
-    ensureNoExpected(expected, matcherName, options);
+    this.utils.ensureNoExpected(expected, matcherName, options);
 
     const pass = received === void 0;
 
     const message = () =>
       // eslint-disable-next-line prefer-template
-      matcherHint(matcherName, undefined, '', options) +
+      this.utils.matcherHint(matcherName, undefined, '', options) +
       '\n\n' +
-      `Received: ${printReceived(received)}`;
+      `Received: ${this.utils.printReceived(received)}`;
 
     return {message, pass};
   },
@@ -457,30 +464,49 @@ const matchers: MatchersObject = {
 
     if (received == null) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${RECEIVED_COLOR('received')} value must not be null nor undefined`,
-          printWithType('Received', received, printReceived),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.RECEIVED_COLOR(
+            'received',
+          )} value must not be null nor undefined`,
+          this.utils.printWithType(
+            'Received',
+            received,
+            this.utils.printReceived,
+          ),
         ),
       );
     }
 
     if (typeof received === 'string') {
-      const wrongTypeErrorMessage = `${EXPECTED_COLOR(
+      const wrongTypeErrorMessage = `${this.utils.EXPECTED_COLOR(
         'expected',
-      )} value must be a string if ${RECEIVED_COLOR(
+      )} value must be a string if ${this.utils.RECEIVED_COLOR(
         'received',
       )} value is a string`;
 
       if (typeof expected !== 'string') {
         throw new Error(
-          matcherErrorMessage(
-            matcherHint(matcherName, received, String(expected), options),
+          this.utils.matcherErrorMessage(
+            this.utils.matcherHint(
+              matcherName,
+              received,
+              String(expected),
+              options,
+            ),
             wrongTypeErrorMessage,
             // eslint-disable-next-line prefer-template
-            printWithType('Expected', expected, printExpected) +
+            this.utils.printWithType(
+              'Expected',
+              expected,
+              this.utils.printExpected,
+            ) +
               '\n' +
-              printWithType('Received', received, printReceived),
+              this.utils.printWithType(
+                'Received',
+                received,
+                this.utils.printReceived,
+              ),
           ),
         );
       }
@@ -493,15 +519,18 @@ const matchers: MatchersObject = {
           typeof expected === 'string' ? 'substring' : 'value'
         }`;
         const labelReceived = 'Received string';
-        const printLabel = getLabelPrinter(labelExpected, labelReceived);
+        const printLabel = this.utils.getLabelPrinter(
+          labelExpected,
+          labelReceived,
+        );
 
         return (
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          `${printLabel(labelExpected)}${isNot ? 'not ' : ''}${printExpected(
-            expected,
-          )}\n` +
+          `${printLabel(labelExpected)}${
+            isNot ? 'not ' : ''
+          }${this.utils.printExpected(expected)}\n` +
           `${printLabel(labelReceived)}${isNot ? '    ' : ''}${
             isNot
               ? printReceivedStringContainExpectedSubstring(
@@ -509,7 +538,7 @@ const matchers: MatchersObject = {
                   index,
                   String(expected).length,
                 )
-              : printReceived(received)
+              : this.utils.printReceived(received)
           }`
         );
       };
@@ -524,25 +553,28 @@ const matchers: MatchersObject = {
     const message = () => {
       const labelExpected = 'Expected value';
       const labelReceived = `Received ${getType(received)}`;
-      const printLabel = getLabelPrinter(labelExpected, labelReceived);
+      const printLabel = this.utils.getLabelPrinter(
+        labelExpected,
+        labelReceived,
+      );
 
       return (
         // eslint-disable-next-line prefer-template
-        matcherHint(matcherName, undefined, undefined, options) +
+        this.utils.matcherHint(matcherName, undefined, undefined, options) +
         '\n\n' +
-        `${printLabel(labelExpected)}${isNot ? 'not ' : ''}${printExpected(
-          expected,
-        )}\n` +
+        `${printLabel(labelExpected)}${
+          isNot ? 'not ' : ''
+        }${this.utils.printExpected(expected)}\n` +
         `${printLabel(labelReceived)}${isNot ? '    ' : ''}${
           isNot && Array.isArray(received)
             ? printReceivedArrayContainExpectedItem(received, index)
-            : printReceived(received)
+            : this.utils.printReceived(received)
         }` +
         (!isNot &&
         indexable.findIndex(item =>
           equals(item, expected, [iterableEquality]),
         ) !== -1
-          ? `\n\n${SUGGEST_TO_CONTAIN_EQUAL}`
+          ? `\n\n${this.utils.SUGGEST_TO_CONTAIN_EQUAL}`
           : '')
       );
     };
@@ -561,10 +593,16 @@ const matchers: MatchersObject = {
 
     if (received == null) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${RECEIVED_COLOR('received')} value must not be null nor undefined`,
-          printWithType('Received', received, printReceived),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.RECEIVED_COLOR(
+            'received',
+          )} value must not be null nor undefined`,
+          this.utils.printWithType(
+            'Received',
+            received,
+            this.utils.printReceived,
+          ),
         ),
       );
     }
@@ -577,19 +615,22 @@ const matchers: MatchersObject = {
     const message = () => {
       const labelExpected = 'Expected value';
       const labelReceived = `Received ${getType(received)}`;
-      const printLabel = getLabelPrinter(labelExpected, labelReceived);
+      const printLabel = this.utils.getLabelPrinter(
+        labelExpected,
+        labelReceived,
+      );
 
       return (
         // eslint-disable-next-line prefer-template
-        matcherHint(matcherName, undefined, undefined, options) +
+        this.utils.matcherHint(matcherName, undefined, undefined, options) +
         '\n\n' +
-        `${printLabel(labelExpected)}${isNot ? 'not ' : ''}${printExpected(
-          expected,
-        )}\n` +
+        `${printLabel(labelExpected)}${
+          isNot ? 'not ' : ''
+        }${this.utils.printExpected(expected)}\n` +
         `${printLabel(labelReceived)}${isNot ? '    ' : ''}${
           isNot && Array.isArray(received)
             ? printReceivedArrayContainExpectedItem(received, index)
-            : printReceived(received)
+            : this.utils.printReceived(received)
         }`
       );
     };
@@ -610,17 +651,17 @@ const matchers: MatchersObject = {
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          `Expected: not ${printExpected(expected)}\n` +
-          (stringify(expected) !== stringify(received)
-            ? `Received:     ${printReceived(received)}`
+          `Expected: not ${this.utils.printExpected(expected)}\n` +
+          (this.utils.stringify(expected) !== this.utils.stringify(received)
+            ? `Received:     ${this.utils.printReceived(received)}`
             : '')
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          printDiffOrStringify(
+          this.utils.printDiffOrStringify(
             expected,
             received,
             EXPECTED_LABEL,
@@ -644,17 +685,25 @@ const matchers: MatchersObject = {
 
     if (typeof received?.length !== 'number') {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${RECEIVED_COLOR(
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.RECEIVED_COLOR(
             'received',
           )} value must have a length property whose value must be a number`,
-          printWithType('Received', received, printReceived),
+          this.utils.printWithType(
+            'Received',
+            received,
+            this.utils.printReceived,
+          ),
         ),
       );
     }
 
-    ensureExpectedIsNonNegativeInteger(expected, matcherName, options);
+    this.utils.ensureExpectedIsNonNegativeInteger(
+      expected,
+      matcherName,
+      options,
+    );
 
     const pass = received.length === expected;
 
@@ -662,7 +711,7 @@ const matchers: MatchersObject = {
       const labelExpected = 'Expected length';
       const labelReceivedLength = 'Received length';
       const labelReceivedValue = `Received ${getType(received)}`;
-      const printLabel = getLabelPrinter(
+      const printLabel = this.utils.getLabelPrinter(
         labelExpected,
         labelReceivedLength,
         labelReceivedValue,
@@ -670,19 +719,19 @@ const matchers: MatchersObject = {
 
       return (
         // eslint-disable-next-line prefer-template
-        matcherHint(matcherName, undefined, undefined, options) +
+        this.utils.matcherHint(matcherName, undefined, undefined, options) +
         '\n\n' +
-        `${printLabel(labelExpected)}${isNot ? 'not ' : ''}${printExpected(
-          expected,
-        )}\n` +
+        `${printLabel(labelExpected)}${
+          isNot ? 'not ' : ''
+        }${this.utils.printExpected(expected)}\n` +
         (isNot
           ? ''
-          : `${printLabel(labelReceivedLength)}${printReceived(
+          : `${printLabel(labelReceivedLength)}${this.utils.printReceived(
               received.length,
             )}\n`) +
-        `${printLabel(labelReceivedValue)}${isNot ? '    ' : ''}${printReceived(
-          received,
-        )}`
+        `${printLabel(labelReceivedValue)}${
+          isNot ? '    ' : ''
+        }${this.utils.printReceived(received)}`
       );
     };
 
@@ -705,10 +754,21 @@ const matchers: MatchersObject = {
 
     if (received === null || received === undefined) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, expectedArgument, options),
-          `${RECEIVED_COLOR('received')} value must not be null nor undefined`,
-          printWithType('Received', received, printReceived),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(
+            matcherName,
+            undefined,
+            expectedArgument,
+            options,
+          ),
+          `${this.utils.RECEIVED_COLOR(
+            'received',
+          )} value must not be null nor undefined`,
+          this.utils.printWithType(
+            'Received',
+            received,
+            this.utils.printReceived,
+          ),
         ),
       );
     }
@@ -717,10 +777,21 @@ const matchers: MatchersObject = {
 
     if (expectedPathType !== 'string' && expectedPathType !== 'array') {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, expectedArgument, options),
-          `${EXPECTED_COLOR('expected')} path must be a string or array`,
-          printWithType('Expected', expectedPath, printExpected),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(
+            matcherName,
+            undefined,
+            expectedArgument,
+            options,
+          ),
+          `${this.utils.EXPECTED_COLOR(
+            'expected',
+          )} path must be a string or array`,
+          this.utils.printWithType(
+            'Expected',
+            expectedPath,
+            this.utils.printExpected,
+          ),
         ),
       );
     }
@@ -732,10 +803,21 @@ const matchers: MatchersObject = {
 
     if (expectedPathType === 'array' && expectedPathLength === 0) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, expectedArgument, options),
-          `${EXPECTED_COLOR('expected')} path must not be an empty array`,
-          printWithType('Expected', expectedPath, printExpected),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(
+            matcherName,
+            undefined,
+            expectedArgument,
+            options,
+          ),
+          `${this.utils.EXPECTED_COLOR(
+            'expected',
+          )} path must not be an empty array`,
+          this.utils.printWithType(
+            'Expected',
+            expectedPath,
+            this.utils.printExpected,
+          ),
         ),
       );
     }
@@ -754,39 +836,56 @@ const matchers: MatchersObject = {
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            undefined,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
           (hasValue
-            ? `Expected path: ${printExpected(expectedPath)}\n\n` +
-              `Expected value: not ${printExpected(expectedValue)}${
-                stringify(expectedValue) !== stringify(receivedValue)
-                  ? `\nReceived value:     ${printReceived(receivedValue)}`
+            ? `Expected path: ${this.utils.printExpected(expectedPath)}\n\n` +
+              `Expected value: not ${this.utils.printExpected(expectedValue)}${
+                this.utils.stringify(expectedValue) !==
+                this.utils.stringify(receivedValue)
+                  ? `\nReceived value:     ${this.utils.printReceived(
+                      receivedValue,
+                    )}`
                   : ''
               }`
-            : `Expected path: not ${printExpected(expectedPath)}\n\n` +
-              `Received value: ${printReceived(receivedValue)}`)
+            : `Expected path: not ${this.utils.printExpected(
+                expectedPath,
+              )}\n\n` +
+              `Received value: ${this.utils.printReceived(receivedValue)}`)
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, expectedArgument, options) +
+          this.utils.matcherHint(
+            matcherName,
+            undefined,
+            expectedArgument,
+            options,
+          ) +
           '\n\n' +
-          `Expected path: ${printExpected(expectedPath)}\n` +
+          `Expected path: ${this.utils.printExpected(expectedPath)}\n` +
           (hasCompletePath
-            ? `\n${printDiffOrStringify(
+            ? `\n${this.utils.printDiffOrStringify(
                 expectedValue,
                 receivedValue,
                 EXPECTED_VALUE_LABEL,
                 RECEIVED_VALUE_LABEL,
                 isExpand(this.expand),
               )}`
-            : `Received path: ${printReceived(
+            : `Received path: ${this.utils.printReceived(
                 expectedPathType === 'array' || receivedPath.length === 0
                   ? receivedPath
                   : receivedPath.join('.'),
               )}\n\n${
                 hasValue
-                  ? `Expected value: ${printExpected(expectedValue)}\n`
+                  ? `Expected value: ${this.utils.printExpected(
+                      expectedValue,
+                    )}\n`
                   : ''
-              }Received value: ${printReceived(receivedValue)}`);
+              }Received value: ${this.utils.printReceived(receivedValue)}`);
 
     return {message, pass};
   },
@@ -800,10 +899,14 @@ const matchers: MatchersObject = {
 
     if (typeof received !== 'string') {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${RECEIVED_COLOR('received')} value must be a string`,
-          printWithType('Received', received, printReceived),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.RECEIVED_COLOR('received')} value must be a string`,
+          this.utils.printWithType(
+            'Received',
+            received,
+            this.utils.printReceived,
+          ),
         ),
       );
     }
@@ -813,12 +916,16 @@ const matchers: MatchersObject = {
       !(expected && typeof expected.test === 'function')
     ) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${EXPECTED_COLOR(
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.EXPECTED_COLOR(
             'expected',
           )} value must be a string or regular expression`,
-          printWithType('Expected', expected, printExpected),
+          this.utils.printWithType(
+            'Expected',
+            expected,
+            this.utils.printExpected,
+          ),
         ),
       );
     }
@@ -832,18 +939,30 @@ const matchers: MatchersObject = {
       ? () =>
           typeof expected === 'string'
             ? // eslint-disable-next-line prefer-template
-              matcherHint(matcherName, undefined, undefined, options) +
+              this.utils.matcherHint(
+                matcherName,
+                undefined,
+                undefined,
+                options,
+              ) +
               '\n\n' +
-              `Expected substring: not ${printExpected(expected)}\n` +
+              `Expected substring: not ${this.utils.printExpected(
+                expected,
+              )}\n` +
               `Received string:        ${printReceivedStringContainExpectedSubstring(
                 received,
                 received.indexOf(expected),
                 expected.length,
               )}`
             : // eslint-disable-next-line prefer-template
-              matcherHint(matcherName, undefined, undefined, options) +
+              this.utils.matcherHint(
+                matcherName,
+                undefined,
+                undefined,
+                options,
+              ) +
               '\n\n' +
-              `Expected pattern: not ${printExpected(expected)}\n` +
+              `Expected pattern: not ${this.utils.printExpected(expected)}\n` +
               `Received string:      ${printReceivedStringContainExpectedResult(
                 received,
                 typeof expected.exec === 'function'
@@ -855,14 +974,19 @@ const matchers: MatchersObject = {
             typeof expected === 'string' ? 'substring' : 'pattern'
           }`;
           const labelReceived = 'Received string';
-          const printLabel = getLabelPrinter(labelExpected, labelReceived);
+          const printLabel = this.utils.getLabelPrinter(
+            labelExpected,
+            labelReceived,
+          );
 
           return (
             // eslint-disable-next-line prefer-template
-            matcherHint(matcherName, undefined, undefined, options) +
+            this.utils.matcherHint(matcherName, undefined, undefined, options) +
             '\n\n' +
-            `${printLabel(labelExpected)}${printExpected(expected)}\n` +
-            `${printLabel(labelReceived)}${printReceived(received)}`
+            `${printLabel(labelExpected)}${this.utils.printExpected(
+              expected,
+            )}\n` +
+            `${printLabel(labelReceived)}${this.utils.printReceived(received)}`
           );
         };
 
@@ -878,20 +1002,32 @@ const matchers: MatchersObject = {
 
     if (typeof received !== 'object' || received === null) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${RECEIVED_COLOR('received')} value must be a non-null object`,
-          printWithType('Received', received, printReceived),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.RECEIVED_COLOR(
+            'received',
+          )} value must be a non-null object`,
+          this.utils.printWithType(
+            'Received',
+            received,
+            this.utils.printReceived,
+          ),
         ),
       );
     }
 
     if (typeof expected !== 'object' || expected === null) {
       throw new Error(
-        matcherErrorMessage(
-          matcherHint(matcherName, undefined, undefined, options),
-          `${EXPECTED_COLOR('expected')} value must be a non-null object`,
-          printWithType('Expected', expected, printExpected),
+        this.utils.matcherErrorMessage(
+          this.utils.matcherHint(matcherName, undefined, undefined, options),
+          `${this.utils.EXPECTED_COLOR(
+            'expected',
+          )} value must be a non-null object`,
+          this.utils.printWithType(
+            'Expected',
+            expected,
+            this.utils.printExpected,
+          ),
         ),
       );
     }
@@ -901,17 +1037,17 @@ const matchers: MatchersObject = {
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          `Expected: not ${printExpected(expected)}` +
-          (stringify(expected) !== stringify(received)
-            ? `\nReceived:     ${printReceived(received)}`
+          `Expected: not ${this.utils.printExpected(expected)}` +
+          (this.utils.stringify(expected) !== this.utils.stringify(received)
+            ? `\nReceived:     ${this.utils.printReceived(received)}`
             : '')
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          printDiffOrStringify(
+          this.utils.printDiffOrStringify(
             expected,
             getObjectSubset(received, expected),
             EXPECTED_LABEL,
@@ -935,17 +1071,17 @@ const matchers: MatchersObject = {
     const message = pass
       ? () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          `Expected: not ${printExpected(expected)}\n` +
-          (stringify(expected) !== stringify(received)
-            ? `Received:     ${printReceived(received)}`
+          `Expected: not ${this.utils.printExpected(expected)}\n` +
+          (this.utils.stringify(expected) !== this.utils.stringify(received)
+            ? `Received:     ${this.utils.printReceived(received)}`
             : '')
       : () =>
           // eslint-disable-next-line prefer-template
-          matcherHint(matcherName, undefined, undefined, options) +
+          this.utils.matcherHint(matcherName, undefined, undefined, options) +
           '\n\n' +
-          printDiffOrStringify(
+          this.utils.printDiffOrStringify(
             expected,
             received,
             EXPECTED_LABEL,
