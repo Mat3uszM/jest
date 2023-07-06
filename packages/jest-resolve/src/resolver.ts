@@ -461,6 +461,12 @@ export default class Resolver {
     );
   }
 
+  normalizeCoreModuleSpecifier(specifier: string): string {
+    return specifier.startsWith('node:')
+      ? specifier.slice('node:'.length)
+      : specifier;
+  }
+
   getModule(name: string): string | null {
     return this._moduleMap.getModule(
       name,
@@ -486,27 +492,25 @@ export default class Resolver {
 
   getMockModule(from: string, name: string): string | null {
     const mock = this._moduleMap.getMockModule(name);
-    if (mock) {
-      return mock;
-    } else {
-      const moduleName = this.resolveStubModuleName(from, name);
-      if (moduleName) {
-        return this.getModule(moduleName) || moduleName;
-      }
+    if (mock) return mock;
+
+    const resolvedName = this.resolveStubModuleName(from, name);
+    if (resolvedName) {
+      return this._moduleMap.getMockModule(resolvedName) ?? null;
     }
+
     return null;
   }
 
   async getMockModuleAsync(from: string, name: string): Promise<string | null> {
     const mock = this._moduleMap.getMockModule(name);
-    if (mock) {
-      return mock;
-    } else {
-      const moduleName = await this.resolveStubModuleNameAsync(from, name);
-      if (moduleName) {
-        return this.getModule(moduleName) || moduleName;
-      }
+    if (mock) return mock;
+
+    const resolvedName = await this.resolveStubModuleNameAsync(from, name);
+    if (resolvedName) {
+      return this._moduleMap.getMockModule(resolvedName) ?? null;
     }
+
     return null;
   }
 
@@ -616,7 +620,7 @@ export default class Resolver {
     options?: ResolveModuleConfig,
   ): string | null {
     if (this.isCoreModule(moduleName)) {
-      return moduleName;
+      return this.normalizeCoreModuleSpecifier(moduleName);
     }
     if (moduleName.startsWith('data:')) {
       return moduleName;
@@ -766,6 +770,11 @@ export default class Resolver {
     from: string,
     moduleName: string,
   ): Promise<string | null> {
+    // Strip node URL scheme from core modules imported using it
+    if (this.isCoreModule(moduleName)) {
+      return this.normalizeCoreModuleSpecifier(moduleName);
+    }
+
     const dirname = path.dirname(from);
 
     const {extensions, moduleDirectory, paths} = this._prepareForResolution(
