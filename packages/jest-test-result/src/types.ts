@@ -1,5 +1,5 @@
 /**
- * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -8,7 +8,9 @@
 import type {V8Coverage} from 'collect-v8-coverage';
 import type {CoverageMap, CoverageMapData} from 'istanbul-lib-coverage';
 import type {ConsoleBuffer} from '@jest/console';
-import type {Config, TestResult, TransformTypes} from '@jest/types';
+import type {Circus, Config, TestResult, TransformTypes} from '@jest/types';
+import type {IHasteFS, IModuleMap} from 'jest-haste-map';
+import type Resolver from 'jest-resolve';
 
 export interface RuntimeTransformResult extends TransformTypes.TransformResult {
   wrapperLength: number;
@@ -40,15 +42,11 @@ export type AssertionLocation = {
 
 export type Status = AssertionResult['status'];
 
-export type Bytes = number;
-
-export type Milliseconds = TestResult.Milliseconds;
-
 export type AssertionResult = TestResult.AssertionResult;
 
 export type FormattedAssertionResult = Pick<
   AssertionResult,
-  'ancestorTitles' | 'fullName' | 'location' | 'status' | 'title'
+  'ancestorTitles' | 'fullName' | 'location' | 'status' | 'title' | 'duration'
 > & {
   failureMessages: AssertionResult['failureMessages'] | null;
 };
@@ -70,11 +68,16 @@ export type AggregatedResultWithoutCoverage = {
   success: boolean;
   testResults: Array<TestResult>;
   wasInterrupted: boolean;
+  runExecError?: SerializableError;
 };
 
 export type AggregatedResult = AggregatedResultWithoutCoverage & {
   coverageMap?: CoverageMap | null;
 };
+
+export type TestResultsProcessor = (
+  results: AggregatedResult,
+) => AggregatedResult | Promise<AggregatedResult>;
 
 export type Suite = {
   title: string;
@@ -90,17 +93,17 @@ export type TestResult = {
   displayName?: Config.DisplayName;
   failureMessage?: string | null;
   leaks: boolean;
-  memoryUsage?: Bytes;
+  memoryUsage?: number;
   numFailingTests: number;
   numPassingTests: number;
   numPendingTests: number;
   numTodoTests: number;
   openHandles: Array<Error>;
   perfStats: {
-    end: Milliseconds;
-    runtime: Milliseconds;
+    end: number;
+    runtime: number;
     slow: boolean;
-    start: Milliseconds;
+    start: number;
   };
   skipped: boolean;
   snapshot: {
@@ -113,7 +116,7 @@ export type TestResult = {
     updated: number;
   };
   testExecError?: SerializableError;
-  testFilePath: Config.Path;
+  testFilePath: string;
   testResults: Array<AssertionResult>;
   v8Coverage?: V8CoverageResult;
 };
@@ -122,7 +125,7 @@ export type FormattedTestResult = {
   message: string;
   name: string;
   summary: string;
-  status: 'failed' | 'passed';
+  status: 'failed' | 'passed' | 'skipped' | 'focused';
   startTime: number;
   endTime: number;
   coverage: unknown;
@@ -175,3 +178,30 @@ export type SnapshotSummary = {
   unmatched: number;
   updated: number;
 };
+
+export type Test = {
+  context: TestContext;
+  duration?: number;
+  path: string;
+};
+
+export type TestContext = {
+  config: Config.ProjectConfig;
+  hasteFS: IHasteFS;
+  moduleMap: IModuleMap;
+  resolver: Resolver;
+};
+
+// Typings for `sendMessageToJest` events
+export type TestEvents = {
+  'test-file-start': [Test];
+  'test-file-success': [Test, TestResult];
+  'test-file-failure': [Test, SerializableError];
+  'test-case-start': [string, Circus.TestCaseStartInfo];
+  'test-case-result': [string, AssertionResult];
+};
+
+export type TestFileEvent<T extends keyof TestEvents = keyof TestEvents> = (
+  eventName: T,
+  args: TestEvents[T],
+) => unknown;
