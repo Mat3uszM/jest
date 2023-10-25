@@ -81,9 +81,6 @@ export default class JSDOMEnvironment implements JestEnvironment<number> {
     this.global.Error.stackTraceLimit = 100;
     installCommonGlobals(global, projectConfig.globals);
 
-    // TODO: remove this ASAP, but it currently causes tests to run really slow
-    global.Buffer = Buffer;
-
     // Report uncaught errors.
     this.errorEventListener = event => {
       if (userErrorListenerCount === 0 && event.error != null) {
