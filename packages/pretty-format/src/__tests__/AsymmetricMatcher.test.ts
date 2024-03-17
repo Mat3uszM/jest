@@ -95,6 +95,62 @@ test('objectNotContaining()', () => {
 }`);
 });
 
+test('satisfies(description, predicate)', () => {
+  const result = prettyFormat(
+    expect.satisfies('xyzzy', () => true),
+    options,
+  );
+  expect(result).toBe('Satisfies "xyzzy"');
+});
+
+test('satisfies(anonymous predicate)', () => {
+  const result = prettyFormat(
+    expect.satisfies(() => true),
+    options,
+  );
+  expect(result).toBe('Satisfies');
+});
+
+test('satisfies(named predicate)', () => {
+  function myPredicate() {}
+  const result = prettyFormat(expect.satisfies(myPredicate), options);
+  expect(result).toBe('Satisfies myPredicate');
+});
+
+test('satisfies(named const predicate)', () => {
+  const myPredicate = () => true;
+  const result = prettyFormat(expect.satisfies(myPredicate), options);
+  expect(result).toBe('Satisfies myPredicate');
+});
+
+test('not.satisfies(description, predicate)', () => {
+  const result = prettyFormat(
+    expect.not.satisfies('xyzzy', () => true),
+    options,
+  );
+  expect(result).toBe('NotSatisfies "xyzzy"');
+});
+
+test('not.satisfies(anonymous predicate)', () => {
+  const result = prettyFormat(
+    expect.not.satisfies(() => true),
+    options,
+  );
+  expect(result).toBe('NotSatisfies');
+});
+
+test('not.satisfies(named predicate)', () => {
+  function myPredicate() {}
+  const result = prettyFormat(expect.not.satisfies(myPredicate), options);
+  expect(result).toBe('NotSatisfies myPredicate');
+});
+
+test('not.satisfies(named const predicate)', () => {
+  const myPredicate = () => true;
+  const result = prettyFormat(expect.not.satisfies(myPredicate), options);
+  expect(result).toBe('NotSatisfies myPredicate');
+});
+
 test('stringContaining(string)', () => {
   const result = prettyFormat(expect.stringContaining('jest'), options);
   expect(result).toBe('StringContaining "jest"');
@@ -183,6 +239,7 @@ test('supports multiple nested asymmetric matchers', () => {
           d: expect.stringContaining('jest'),
           e: expect.stringMatching('jest'),
           f: expect.objectContaining({test: 'case'}),
+          g: expect.satisfies(() => true),
         }),
       },
     },
@@ -201,6 +258,7 @@ test('supports multiple nested asymmetric matchers', () => {
       "f": ObjectContaining {
         "test": "case",
       },
+      "g": Satisfies,
     },
   },
 }`);
