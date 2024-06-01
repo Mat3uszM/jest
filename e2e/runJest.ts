@@ -12,6 +12,7 @@ import dedent from 'dedent';
 import execa = require('execa');
 import * as fs from 'graceful-fs';
 import stripAnsi = require('strip-ansi');
+import {TestPathPatterns} from '@jest/pattern';
 import type {FormattedTestResults} from '@jest/test-result';
 import {normalizeIcons} from '@jest/test-utils';
 import type {Config} from '@jest/types';
@@ -87,6 +88,7 @@ function spawnJest(
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     FORCE_COLOR: '0',
+    NO_COLOR: '1',
     ...options.env,
   };
 
@@ -151,10 +153,10 @@ export const json = function (
       ...result,
       json: JSON.parse(result.stdout),
     };
-  } catch (e: any) {
+  } catch (error: any) {
     throw new Error(dedent`
       Can't parse JSON.
-      ERROR: ${e.name} ${e.message}
+      ERROR: ${error.name} ${error.message}
       STDOUT: ${result.stdout}
       STDERR: ${result.stderr}
     `);
@@ -273,7 +275,7 @@ export function getConfig(
 } {
   const {exitCode, stdout, stderr} = runJest(
     dir,
-    args.concat('--show-config'),
+    [...args, '--show-config'],
     options,
   );
 
@@ -284,5 +286,10 @@ export function getConfig(
     throw error;
   }
 
-  return JSON.parse(stdout);
+  const {testPathPatterns, ...globalConfig} = JSON.parse(stdout);
+
+  return {
+    ...globalConfig,
+    testPathPatterns: new TestPathPatterns(testPathPatterns),
+  };
 }

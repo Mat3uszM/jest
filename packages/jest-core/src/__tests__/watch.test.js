@@ -7,6 +7,7 @@
  */
 
 import chalk from 'chalk';
+import {TestPathPatterns} from '@jest/pattern';
 // eslint-disable-next-line import/order
 import {JestHook, KEYS, TestWatcher} from 'jest-watcher';
 
@@ -45,7 +46,7 @@ jest.doMock(
   '../runJest',
   () =>
     function () {
-      const args = Array.from(arguments);
+      const args = [...arguments];
       const [{onComplete}] = args;
       runJestMock.apply(null, args);
 
@@ -88,7 +89,7 @@ const regularUpdateGlobalConfig = require('../lib/updateGlobalConfig').default;
 const updateGlobalConfig = jest.fn(regularUpdateGlobalConfig);
 jest.doMock('../lib/updateGlobalConfig', () => updateGlobalConfig);
 
-const nextTick = () => new Promise(res => process.nextTick(res));
+const nextTick = () => new Promise(resolve => process.nextTick(resolve));
 
 beforeAll(() => {
   jest.spyOn(process, 'on').mockImplementation(() => {});
@@ -142,7 +143,7 @@ describe('Watch mode flows', () => {
     pipe = {write: jest.fn()};
     globalConfig = {
       rootDir: '',
-      testPathPatterns: [],
+      testPathPatterns: new TestPathPatterns([]),
       watch: true,
     };
     hasteMapInstances = [{on: () => {}}];
@@ -156,7 +157,7 @@ describe('Watch mode flows', () => {
   });
 
   it('Correctly passing test path pattern', async () => {
-    globalConfig.testPathPatterns = ['test-*'];
+    globalConfig.testPathPatterns = new TestPathPatterns(['test-*']);
 
     await watch(globalConfig, contexts, pipe, hasteMapInstances, stdin);
 
@@ -690,6 +691,14 @@ describe('Watch mode flows', () => {
       ok = ok === '✔︎';
       const pluginPath = `${__dirname}/__fixtures__/plugin_path_config_updater_${option}`;
 
+      const newVal = (() => {
+        if (option === 'testPathPatterns') {
+          return new TestPathPatterns(['a/b', 'c']);
+        }
+
+        return '__JUST_TRYING__';
+      })();
+
       jest.doMock(
         pluginPath,
         () =>
@@ -699,7 +708,7 @@ describe('Watch mode flows', () => {
             }
 
             run(globalConfig, updateConfigAndRun) {
-              updateConfigAndRun({[option]: '__JUST_TRYING__'});
+              updateConfigAndRun({[option]: newVal});
               return Promise.resolve();
             }
           },
@@ -720,13 +729,13 @@ describe('Watch mode flows', () => {
 
       // We need the penultimate call as Jest forces a final call to restore
       // updateSnapshot because it's not sticky after a run…?
-      const lastCall = updateGlobalConfig.mock.calls.slice(-2)[0];
+      const lastCall = updateGlobalConfig.mock.calls.at(-2);
       // eslint-disable-next-line jest/valid-expect
       let expector = expect(lastCall[1]);
       if (!ok) {
         expector = expector.not;
       }
-      expector.toHaveProperty(option, '__JUST_TRYING__');
+      expector.toHaveProperty(option, newVal);
     },
   );
 
@@ -771,7 +780,9 @@ describe('Watch mode flows', () => {
 
   it('prevents Jest from handling keys when active and returns control when end is called', async () => {
     let resolveShowPrompt;
-    const run = jest.fn(() => new Promise(res => (resolveShowPrompt = res)));
+    const run = jest.fn(
+      () => new Promise(resolve => (resolveShowPrompt = resolve)),
+    );
     const pluginPath = `${__dirname}/__fixtures__/plugin_path_1`;
     jest.doMock(
       pluginPath,
@@ -902,7 +913,7 @@ describe('Watch mode flows', () => {
     await nextTick();
 
     expect(runJestMock.mock.calls[0][0].globalConfig).toMatchObject({
-      testPathPatterns: ['file'],
+      testPathPatterns: {patterns: ['file']},
       watch: true,
       watchAll: false,
     });
@@ -926,7 +937,7 @@ describe('Watch mode flows', () => {
 
     expect(runJestMock.mock.calls[1][0].globalConfig).toMatchObject({
       testNamePattern: 'test',
-      testPathPatterns: ['file'],
+      testPathPatterns: {patterns: ['file']},
       watch: true,
       watchAll: false,
     });

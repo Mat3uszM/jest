@@ -6,21 +6,23 @@
  */
 
 import * as fs from 'graceful-fs';
+import {
+  type SnapshotData,
+  getSnapshotData,
+  keyToTestName,
+  saveSnapshotFile,
+  testNameToKey,
+} from '@jest/snapshot-utils';
 import type {Config} from '@jest/types';
 import {getStackTraceLines, getTopFrame} from 'jest-message-util';
 import {saveInlineSnapshots} from './InlineSnapshots';
-import type {InlineSnapshot, SnapshotData, SnapshotFormat} from './types';
+import type {InlineSnapshot, SnapshotFormat} from './types';
 import {
   addExtraLineBreaks,
-  getSnapshotData,
-  keyToTestName,
   removeExtraLineBreaks,
   removeLinesBeforeExternalMatcherTrap,
-  saveSnapshotFile,
   serialize,
-  testNameToKey,
 } from './utils';
-
 export type SnapshotStateOptions = {
   readonly updateSnapshot: Config.SnapshotUpdateState;
   readonly prettierPath?: string | null;
@@ -113,6 +115,7 @@ export default class SnapshotState {
   ): void {
     this._dirty = true;
     if (options.isInline) {
+      // eslint-disable-next-line unicorn/error-message
       const error = options.error || new Error();
       const lines = getStackTraceLines(
         removeLinesBeforeExternalMatcherTrap(error.stack || ''),
@@ -180,7 +183,7 @@ export default class SnapshotState {
   }
 
   getUncheckedKeys(): Array<string> {
-    return Array.from(this._uncheckedKeys);
+    return [...this._uncheckedKeys];
   }
 
   removeUncheckedKeys(): void {

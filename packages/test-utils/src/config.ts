@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import {TestPathPatterns} from '@jest/pattern';
 import type {Config} from '@jest/types';
 
 const DEFAULT_GLOBAL_CONFIG: Config.GlobalConfig = {
@@ -55,7 +56,7 @@ const DEFAULT_GLOBAL_CONFIG: Config.GlobalConfig = {
   snapshotFormat: {},
   testFailureExitCode: 1,
   testNamePattern: '',
-  testPathPatterns: [],
+  testPathPatterns: new TestPathPatterns([]),
   testResultsProcessor: undefined,
   testSequencer: '@jest/test-sequencer',
   testTimeout: 5000,
@@ -77,6 +78,7 @@ const DEFAULT_PROJECT_CONFIG: Config.ProjectConfig = {
   collectCoverageFrom: ['src', '!public'],
   coverageDirectory: 'coverage',
   coveragePathIgnorePatterns: [],
+  coverageReporters: [],
   cwd: '/test_root_dir/',
   detectLeaks: false,
   detectOpenHandles: false,
@@ -99,6 +101,11 @@ const DEFAULT_PROJECT_CONFIG: Config.ProjectConfig = {
   modulePaths: [],
   openHandlesTimeout: 1000,
   prettierPath: 'prettier',
+  reporters: [
+    'default',
+    'custom-reporter-1',
+    ['custom-reporter-2', {configValue: true}],
+  ],
   resetMocks: false,
   resetModules: false,
   resolver: undefined,
@@ -123,6 +130,7 @@ const DEFAULT_PROJECT_CONFIG: Config.ProjectConfig = {
   testPathIgnorePatterns: [],
   testRegex: ['\\.test\\.js$'],
   testRunner: 'jest-circus/runner',
+  testTimeout: 5000,
   transform: [],
   transformIgnorePatterns: [],
   unmockedModulePathPatterns: undefined,
@@ -134,13 +142,14 @@ export const makeGlobalConfig = (
   overrides: Partial<Config.GlobalConfig> = {},
 ): Config.GlobalConfig => {
   const overridesKeys = new Set(Object.keys(overrides));
-  for (const key of Object.keys(DEFAULT_GLOBAL_CONFIG))
+  for (const key of Object.keys(DEFAULT_GLOBAL_CONFIG)) {
     overridesKeys.delete(key);
+  }
 
   if (overridesKeys.size > 0) {
     throw new Error(`
       Properties that are not part of GlobalConfig type were passed:
-      ${JSON.stringify(Array.from(overridesKeys))}
+      ${JSON.stringify([...overridesKeys])}
     `);
   }
 
@@ -151,13 +160,14 @@ export const makeProjectConfig = (
   overrides: Partial<Config.ProjectConfig> = {},
 ): Config.ProjectConfig => {
   const overridesKeys = new Set(Object.keys(overrides));
-  for (const key of Object.keys(DEFAULT_PROJECT_CONFIG))
+  for (const key of Object.keys(DEFAULT_PROJECT_CONFIG)) {
     overridesKeys.delete(key);
+  }
 
   if (overridesKeys.size > 0) {
     throw new Error(`
       Properties that are not part of ProjectConfig type were passed:
-      ${JSON.stringify(Array.from(overridesKeys))}
+      ${JSON.stringify([...overridesKeys])}
     `);
   }
 

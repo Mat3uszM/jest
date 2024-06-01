@@ -76,13 +76,8 @@ function eq(
   }
 
   const testerContext: TesterContext = {equals};
-  for (let i = 0; i < customTesters.length; i++) {
-    const customTesterResult = customTesters[i].call(
-      testerContext,
-      a,
-      b,
-      customTesters,
-    );
+  for (const item of customTesters) {
+    const customTesterResult = item.call(testerContext, a, b, customTesters);
     if (customTesterResult !== undefined) {
       return customTesterResult;
     }
@@ -97,7 +92,7 @@ function eq(
   }
   // A strict comparison is necessary because `null == undefined`.
   if (a === null || b === null) {
-    return a === b;
+    return false;
   }
   const className = Object.prototype.toString.call(a);
   if (className != Object.prototype.toString.call(b)) {
@@ -112,7 +107,7 @@ function eq(
         return false;
       } else if (typeof a !== 'object' && typeof b !== 'object') {
         // both are proper primitives
-        return Object.is(a, b);
+        return false;
       } else {
         // both are `new Primitive()`s
         return Object.is(a.valueOf(), b.valueOf());
@@ -218,14 +213,15 @@ function keys(obj: object, hasKey: (obj: object, key: string) => boolean) {
       keys.push(key);
     }
   }
-  return keys.concat(
-    (Object.getOwnPropertySymbols(obj) as Array<any>).filter(
+  return [
+    ...keys,
+    ...Object.getOwnPropertySymbols(obj).filter(
       symbol => Object.getOwnPropertyDescriptor(obj, symbol)!.enumerable,
     ),
-  );
+  ];
 }
 
-function hasKey(obj: any, key: string) {
+function hasKey(obj: any, key: string | symbol) {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
 

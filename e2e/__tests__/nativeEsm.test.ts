@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import {createRequire} from 'module';
 import {resolve} from 'path';
 import {onNodeVersions} from '@jest/test-utils';
 import {extractSummary, runYarnInstall} from '../Utils';
@@ -16,8 +17,19 @@ jest.retryTimes(3);
 
 const DIR = resolve(__dirname, '../native-esm');
 
+let isolatedVmInstalled = false;
+
 beforeAll(() => {
   runYarnInstall(DIR);
+
+  const require = createRequire(`${DIR}/index.js`);
+
+  try {
+    const ivm = require('isolated-vm');
+    isolatedVmInstalled = ivm != null;
+  } catch (error) {
+    console.warn('`isolated-vm` is not installed, skipping tests', error);
+  }
 });
 
 test('test config is without transform', () => {
@@ -108,22 +120,26 @@ test('does not enforce import assertions', () => {
   expect(exitCode).toBe(0);
 });
 
-test('properly handle re-exported native modules in ESM via CJS', () => {
-  const {exitCode, stderr, stdout} = runJest(
-    DIR,
-    ['native-esm-native-module.test.js'],
-    {nodeOptions: '--experimental-vm-modules --no-warnings'},
-  );
+(isolatedVmInstalled ? test : test.skip)(
+  'properly handle re-exported native modules in ESM via CJS',
+  () => {
+    const {exitCode, stderr, stdout} = runJest(
+      DIR,
+      ['native-esm-native-module.test.js'],
+      {nodeOptions: '--experimental-vm-modules --no-warnings'},
+    );
 
-  const {summary} = extractSummary(stderr);
+    const {summary} = extractSummary(stderr);
 
-  expect(summary).toMatchSnapshot();
-  expect(stdout).toBe('');
-  expect(exitCode).toBe(0);
-});
+    expect(summary).toMatchSnapshot();
+    expect(stdout).toBe('');
+    expect(exitCode).toBe(0);
+  },
+);
 
-// version where `vm` API gets `import assertions`
-onNodeVersions('>=16.12.0', () => {
+// support for import assertions in dynamic imports was added in Node.js 16.12.0
+// support for import assertions was removed in Node.js 22.0.0
+onNodeVersions('>=16.12.0 <22.0.0', () => {
   test('supports import assertions', () => {
     const {exitCode, stderr, stdout} = runJest(
       DIR,
@@ -139,7 +155,7 @@ onNodeVersions('>=16.12.0', () => {
   });
 });
 
-onNodeVersions('<16.12.0', () => {
+onNodeVersions('<16.12.0 || >=22.0.0', () => {
   test('syntax error for import assertions', () => {
     const {exitCode, stderr, stdout} = runJest(
       DIR,

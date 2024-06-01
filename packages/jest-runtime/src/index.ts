@@ -122,6 +122,8 @@ type ResolveOptions = Parameters<typeof require.resolve>[1] & {
 
 const testTimeoutSymbol = Symbol.for('TEST_TIMEOUT_SYMBOL');
 const retryTimesSymbol = Symbol.for('RETRY_TIMES');
+const waitBeforeRetrySymbol = Symbol.for('WAIT_BEFORE_RETRY');
+const retryImmediatelySybmbol = Symbol.for('RETRY_IMMEDIATELY');
 const logErrorsBeforeRetrySymbol = Symbol.for('LOG_ERRORS_BEFORE_RETRY');
 
 const NODE_MODULES = `${path.sep}node_modules${path.sep}`;
@@ -163,7 +165,7 @@ export default class Runtime {
   private readonly _cacheFS: Map<string, string>;
   private readonly _cacheFSBuffer = new Map<string, Buffer>();
   private readonly _config: Config.ProjectConfig;
-  private readonly _globalConfig?: Config.GlobalConfig;
+  private readonly _globalConfig: Config.GlobalConfig;
   private readonly _coverageOptions: ShouldInstrumentOptions;
   private _currentlyExecutingModulePath: string;
   private readonly _environment: JestEnvironment;
@@ -223,8 +225,7 @@ export default class Runtime {
     cacheFS: Map<string, string>,
     coverageOptions: ShouldInstrumentOptions,
     testPath: string,
-    // TODO: make mandatory in Jest 30
-    globalConfig?: Config.GlobalConfig,
+    globalConfig: Config.GlobalConfig,
   ) {
     this._cacheFS = cacheFS;
     this._config = config;
@@ -282,12 +283,12 @@ export default class Runtime {
 
     const envExportConditions = this._environment.exportConditions?.() ?? [];
 
-    this.esmConditions = Array.from(
-      new Set(['import', 'default', ...envExportConditions]),
-    );
-    this.cjsConditions = Array.from(
-      new Set(['require', 'default', ...envExportConditions]),
-    );
+    this.esmConditions = [
+      ...new Set(['import', 'default', ...envExportConditions]),
+    ];
+    this.cjsConditions = [
+      ...new Set(['require', 'default', ...envExportConditions]),
+    ];
 
     if (config.automock) {
       for (const filePath of config.setupFiles) {
@@ -361,7 +362,7 @@ export default class Runtime {
       console: options?.console,
       dependencyExtractor: config.dependencyExtractor,
       enableSymlinks: config.haste.enableSymlinks,
-      extensions: [SnapshotExtension].concat(config.moduleFileExtensions),
+      extensions: [SnapshotExtension, ...config.moduleFileExtensions],
       forceNodeFilesystemAPI: config.haste.forceNodeFilesystemAPI,
       hasteImplModulePath: config.haste.hasteImplModulePath,
       hasteMapModulePath: config.haste.hasteMapModulePath,
@@ -422,9 +423,7 @@ export default class Runtime {
     query = '',
   ): Promise<VMModule> {
     const cacheKey = modulePath + query;
-    const registry = this._isolatedModuleRegistry
-      ? this._isolatedModuleRegistry
-      : this._esmoduleRegistry;
+    const registry = this._isolatedModuleRegistry ?? this._esmoduleRegistry;
 
     if (this._fileTransformsMutex.has(cacheKey)) {
       await this._fileTransformsMutex.get(cacheKey);
@@ -519,7 +518,26 @@ export default class Runtime {
               return this.linkAndEvaluateModule(module);
             },
             initializeImportMeta: (meta: JestImportMeta) => {
-              meta.url = pathToFileURL(modulePath).href;
+              const metaUrl = pathToFileURL(modulePath).href;
+              meta.url = metaUrl;
+
+              // @ts-expect-error Jest uses @types/node@16. Will be fixed when updated to @types/node@20.11.0
+              meta.filename = modulePath;
+              // @ts-expect-error Jest uses @types/node@16. Will be fixed when updated to @types/node@20.11.0
+              meta.dirname = path.dirname(modulePath);
+
+              // @ts-expect-error It should not be async. Will be fixed when updated to @types/node@20.11.0
+              meta.resolve = (specifier, parent = metaUrl) => {
+                const parentPath = fileURLToPath(parent);
+
+                const resolvedPath = this._resolver.resolveModule(
+                  parentPath,
+                  specifier,
+                  {conditions: this.esmConditions},
+                );
+
+                return pathToFileURL(resolvedPath).href;
+              };
 
               let jest = this.jestObjectCaches.get(modulePath);
 
@@ -577,9 +595,7 @@ export default class Runtime {
       );
     }
 
-    const registry = this._isolatedModuleRegistry
-      ? this._isolatedModuleRegistry
-      : this._esmoduleRegistry;
+    const registry = this._isolatedModuleRegistry ?? this._esmoduleRegistry;
 
     if (specifier === '@jest/globals') {
       const fromCache = registry.get('@jest/globals');
@@ -675,6 +691,13 @@ export default class Runtime {
             initializeImportMeta(meta: ImportMeta) {
               // no `jest` here as it's not loaded in a file
               meta.url = specifier;
+
+              if (meta.url.startsWith('file://')) {
+                // @ts-expect-error Jest uses @types/node@16. Will be fixed when updated to @types/node@20.11.0
+                meta.filename = fileURLToPath(meta.url);
+                // @ts-expect-error Jest uses @types/node@16. Will be fixed when updated to @types/node@20.11.0
+                meta.dirname = path.dirname(meta.filename);
+              }
             },
           });
         }
@@ -688,19 +711,22 @@ export default class Runtime {
       specifier = fileURLToPath(specifier);
     }
 
-    const [path, query] = specifier.split('?');
+    const [specifierPath, query] = specifier.split('?');
 
     if (
       await this._shouldMockModule(
         referencingIdentifier,
-        path,
+        specifierPath,
         this._explicitShouldMockModule,
       )
     ) {
-      return this.importMock(referencingIdentifier, path, context);
+      return this.importMock(referencingIdentifier, specifierPath, context);
     }
 
-    const resolved = await this._resolveModule(referencingIdentifier, path);
+    const resolved = await this._resolveModule(
+      referencingIdentifier,
+      specifierPath,
+    );
 
     if (
       // json files are modules when imported in modules
@@ -1156,8 +1182,8 @@ export default class Runtime {
       } else {
         return this.requireModule<T>(from, moduleName);
       }
-    } catch (e) {
-      const moduleNotFound = Resolver.tryCastModuleNotFoundError(e);
+    } catch (error) {
+      const moduleNotFound = Resolver.tryCastModuleNotFoundError(error);
       if (moduleNotFound) {
         if (
           moduleNotFound.siblingWithSimilarExtensionFound === null ||
@@ -1175,7 +1201,7 @@ export default class Runtime {
         moduleNotFound.buildMessage(this._config.rootDir);
         throw moduleNotFound;
       }
-      throw e;
+      throw error;
     }
   }
 
@@ -1307,7 +1333,7 @@ export default class Runtime {
             res.url,
             this._coverageOptions,
             this._config,
-            /* loadedFilenames */ Array.from(this._v8CoverageSources!.keys()),
+            /* loadedFilenames */ [...this._v8CoverageSources!.keys()],
           ),
       )
       .map(result => {
@@ -1454,39 +1480,36 @@ export default class Runtime {
       if (module) {
         return module;
       }
-    } else {
-      const {paths} = options;
-      if (paths) {
-        for (const p of paths) {
-          const absolutePath = path.resolve(from, '..', p);
-          const module = this._resolver.resolveModuleFromDirIfExists(
-            absolutePath,
-            moduleName,
-            // required to also resolve files without leading './' directly in the path
-            {conditions: this.cjsConditions, paths: [absolutePath]},
-          );
-          if (module) {
-            return module;
-          }
-        }
-
-        throw new Resolver.ModuleNotFoundError(
-          `Cannot resolve module '${moduleName}' from paths ['${paths.join(
-            "', '",
-          )}'] from ${from}`,
+    } else if (options.paths) {
+      for (const p of options.paths) {
+        const absolutePath = path.resolve(from, '..', p);
+        const module = this._resolver.resolveModuleFromDirIfExists(
+          absolutePath,
+          moduleName,
+          // required to also resolve files without leading './' directly in the path
+          {conditions: this.cjsConditions, paths: [absolutePath]},
         );
+        if (module) {
+          return module;
+        }
       }
+
+      throw new Resolver.ModuleNotFoundError(
+        `Cannot resolve module '${moduleName}' from paths ['${options.paths.join(
+          "', '",
+        )}'] from ${from}`,
+      );
     }
 
     try {
       return this._resolveCjsModule(from, moduleName);
-    } catch (err) {
+    } catch (error) {
       const module = this._resolver.getMockModule(from, moduleName);
 
       if (module) {
         return module;
       } else {
-        throw err;
+        throw error;
       }
     }
   }
@@ -1723,8 +1746,8 @@ export default class Runtime {
           return this.linkAndEvaluateModule(module);
         },
       });
-    } catch (e: any) {
-      throw handlePotentialSyntaxError(e);
+    } catch (error: any) {
+      throw handlePotentialSyntaxError(error);
     }
   }
 
@@ -1818,6 +1841,7 @@ export default class Runtime {
       return this._moduleImplementation;
     }
 
+    // eslint-disable-next-line unicorn/consistent-function-scoping
     const createRequire = (modulePath: string | URL) => {
       const filename =
         typeof modulePath === 'string'
@@ -1948,13 +1972,13 @@ export default class Runtime {
     let modulePath;
     try {
       modulePath = this._resolveCjsModule(from, moduleName);
-    } catch (e) {
+    } catch (error) {
       const manualMock = this._resolver.getMockModule(from, moduleName);
       if (manualMock) {
         this._shouldMockModuleCache.set(moduleID, true);
         return true;
       }
-      throw e;
+      throw error;
     }
 
     if (this._unmockList && this._unmockList.test(modulePath)) {
@@ -2019,7 +2043,7 @@ export default class Runtime {
     let modulePath;
     try {
       modulePath = await this._resolveModule(from, moduleName);
-    } catch (e) {
+    } catch (error) {
       const manualMock = await this._resolver.getMockModuleAsync(
         from,
         moduleName,
@@ -2028,7 +2052,7 @@ export default class Runtime {
         this._shouldMockModuleCache.set(moduleID, true);
         return true;
       }
-      throw e;
+      throw error;
     }
 
     if (this._unmockList && this._unmockList.test(modulePath)) {
@@ -2103,7 +2127,7 @@ export default class Runtime {
         },
         has: (_target, key) =>
           typeof key === 'string' && this._moduleRegistry.has(key),
-        ownKeys: () => Array.from(this._moduleRegistry.keys()),
+        ownKeys: () => [...this._moduleRegistry.keys()],
         set: notPermittedMethod,
       });
     })();
@@ -2174,7 +2198,9 @@ export default class Runtime {
       options,
     ) => {
       if (typeof mockFactory !== 'function') {
-        throw new Error('`unstable_mockModule` must be passed a mock factory');
+        throw new TypeError(
+          '`unstable_mockModule` must be passed a mock factory',
+        );
       }
 
       this.setModuleMock(from, moduleName, mockFactory, options);
@@ -2192,6 +2218,7 @@ export default class Runtime {
       this.restoreAllMocks();
       return jestObject;
     };
+    // eslint-disable-next-line unicorn/consistent-function-scoping
     const _getFakeTimers = () => {
       if (
         this.isTornDown ||
@@ -2235,26 +2262,13 @@ export default class Runtime {
       this.isolateModules(fn);
       return jestObject;
     };
-    const isolateModulesAsync = (fn: () => Promise<void>): Promise<void> => {
-      return this.isolateModulesAsync(fn);
-    };
+    const isolateModulesAsync = this.isolateModulesAsync.bind(this);
     const fn = this._moduleMocker.fn.bind(this._moduleMocker);
     const spyOn = this._moduleMocker.spyOn.bind(this._moduleMocker);
-    const mocked =
-      this._moduleMocker.mocked?.bind(this._moduleMocker) ??
-      (() => {
-        throw new Error(
-          'Your test environment does not support `mocked`, please update it.',
-        );
-      });
-    const replaceProperty =
-      typeof this._moduleMocker.replaceProperty === 'function'
-        ? this._moduleMocker.replaceProperty.bind(this._moduleMocker)
-        : () => {
-            throw new Error(
-              'Your test environment does not support `jest.replaceProperty` - please ensure its Jest dependencies are updated to version 29.4 or later',
-            );
-          };
+    const mocked = this._moduleMocker.mocked.bind(this._moduleMocker);
+    const replaceProperty = this._moduleMocker.replaceProperty.bind(
+      this._moduleMocker,
+    );
 
     const setTimeout: Jest['setTimeout'] = timeout => {
       this._environment.global[testTimeoutSymbol] = timeout;
@@ -2265,6 +2279,10 @@ export default class Runtime {
       this._environment.global[retryTimesSymbol] = numTestRetries;
       this._environment.global[logErrorsBeforeRetrySymbol] =
         options?.logErrorsBeforeRetry;
+      this._environment.global[waitBeforeRetrySymbol] =
+        options?.waitBeforeRetry;
+      this._environment.global[retryImmediatelySybmbol] =
+        options?.retryImmediately;
 
       return jestObject;
     };
@@ -2276,12 +2294,6 @@ export default class Runtime {
         const fakeTimers = _getFakeTimers();
 
         if (fakeTimers === this._environment.fakeTimersModern) {
-          // TODO: remove this check in Jest 30
-          if (typeof fakeTimers.advanceTimersByTimeAsync !== 'function') {
-            throw new TypeError(
-              'Your test environment does not support async fake timers - please ensure its Jest dependencies are updated to version 29.5 or later',
-            );
-          }
           await fakeTimers.advanceTimersByTimeAsync(msToRun);
         } else {
           throw new TypeError(
@@ -2305,12 +2317,6 @@ export default class Runtime {
         const fakeTimers = _getFakeTimers();
 
         if (fakeTimers === this._environment.fakeTimersModern) {
-          // TODO: remove this check in Jest 30
-          if (typeof fakeTimers.advanceTimersToNextTimerAsync !== 'function') {
-            throw new TypeError(
-              'Your test environment does not support async fake timers - please ensure its Jest dependencies are updated to version 29.5 or later',
-            );
-          }
           await fakeTimers.advanceTimersToNextTimerAsync(steps);
         } else {
           throw new TypeError(
@@ -2329,7 +2335,6 @@ export default class Runtime {
       dontMock: unmock,
       enableAutomock,
       fn,
-      genMockFromModule: moduleName => this._generateMock(from, moduleName),
       getRealSystemTime: () => {
         const fakeTimers = _getFakeTimers();
 
@@ -2341,15 +2346,7 @@ export default class Runtime {
           );
         }
       },
-      getSeed: () => {
-        // TODO: remove this check in Jest 30
-        if (this._globalConfig?.seed === undefined) {
-          throw new Error(
-            'The seed value is not available. Likely you are using older versions of the jest dependencies.',
-          );
-        }
-        return this._globalConfig.seed;
-      },
+      getSeed: () => this._globalConfig.seed,
       getTimerCount: () => _getFakeTimers().getTimerCount(),
       isEnvironmentTornDown: () => this.isTornDown,
       isMockFunction: this._moduleMocker.isMockFunction,
@@ -2382,12 +2379,6 @@ export default class Runtime {
         const fakeTimers = _getFakeTimers();
 
         if (fakeTimers === this._environment.fakeTimersModern) {
-          // TODO: remove this check in Jest 30
-          if (typeof fakeTimers.runAllTimersAsync !== 'function') {
-            throw new TypeError(
-              'Your test environment does not support async fake timers - please ensure its Jest dependencies are updated to version 29.5 or later',
-            );
-          }
           await fakeTimers.runAllTimersAsync();
         } else {
           throw new TypeError(
@@ -2400,12 +2391,6 @@ export default class Runtime {
         const fakeTimers = _getFakeTimers();
 
         if (fakeTimers === this._environment.fakeTimersModern) {
-          // TODO: remove this check in Jest 30
-          if (typeof fakeTimers.runOnlyPendingTimersAsync !== 'function') {
-            throw new TypeError(
-              'Your test environment does not support async fake timers - please ensure its Jest dependencies are updated to version 29.5 or later',
-            );
-          }
           await fakeTimers.runOnlyPendingTimersAsync();
         } else {
           throw new TypeError(

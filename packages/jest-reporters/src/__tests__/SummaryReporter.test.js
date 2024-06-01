@@ -6,6 +6,8 @@
  */
 'use strict';
 
+import {TestPathPatterns} from '@jest/pattern';
+
 let SummaryReporter;
 
 const env = {...process.env};
@@ -13,7 +15,7 @@ const now = Date.now;
 const write = process.stderr.write;
 const globalConfig = {
   rootDir: 'root',
-  testPathPatterns: [],
+  testPathPatterns: new TestPathPatterns([]),
   watch: false,
 };
 
@@ -53,7 +55,7 @@ test('snapshots needs update with npm test', () => {
       unmatched: 2,
     },
     startTime: 0,
-    testResults: {},
+    testResults: [],
   };
 
   process.env.npm_config_user_agent = 'npm';
@@ -78,7 +80,7 @@ test('snapshots needs update with yarn test', () => {
       unmatched: 2,
     },
     startTime: 0,
-    testResults: {},
+    testResults: [],
   };
 
   process.env.npm_config_user_agent = 'yarn';
@@ -116,13 +118,13 @@ test('snapshots all have results (no update)', () => {
       updated: 1,
     },
     startTime: 0,
-    testResults: {},
+    testResults: [],
   };
 
   requireReporter();
   const testReporter = new SummaryReporter(globalConfig);
   testReporter.onRunComplete(new Set(), aggregatedResults);
-  expect(results.join('').replace(/\\/g, '/')).toMatchSnapshot();
+  expect(results.join('').replaceAll('\\', '/')).toMatchSnapshot();
 });
 
 test('snapshots all have results (after update)', () => {
@@ -153,13 +155,13 @@ test('snapshots all have results (after update)', () => {
       updated: 1,
     },
     startTime: 0,
-    testResults: {},
+    testResults: [],
   };
 
   requireReporter();
   const testReporter = new SummaryReporter(globalConfig);
   testReporter.onRunComplete(new Set(), aggregatedResults);
-  expect(results.join('').replace(/\\/g, '/')).toMatchSnapshot();
+  expect(results.join('').replaceAll('\\', '/')).toMatchSnapshot();
 });
 
 describe('summaryThreshold option', () => {
@@ -200,7 +202,7 @@ describe('summaryThreshold option', () => {
     requireReporter();
     const testReporter = new SummaryReporter(globalConfig, options);
     testReporter.onRunComplete(new Set(), aggregatedResults);
-    expect(results.join('').replace(/\\/g, '/')).toMatchSnapshot();
+    expect(results.join('').replaceAll('\\', '/')).toMatchSnapshot();
   });
 
   it('Should not print failure messages when number of test suites is under the threshold', () => {
@@ -211,7 +213,7 @@ describe('summaryThreshold option', () => {
     requireReporter();
     const testReporter = new SummaryReporter(globalConfig, options);
     testReporter.onRunComplete(new Set(), aggregatedResults);
-    expect(results.join('').replace(/\\/g, '/')).toMatchSnapshot();
+    expect(results.join('').replaceAll('\\', '/')).toMatchSnapshot();
   });
 
   it('Should not print failure messages when number of test suites is equal to the threshold', () => {
@@ -222,7 +224,7 @@ describe('summaryThreshold option', () => {
     requireReporter();
     const testReporter = new SummaryReporter(globalConfig, options);
     testReporter.onRunComplete(new Set(), aggregatedResults);
-    expect(results.join('').replace(/\\/g, '/')).toMatchSnapshot();
+    expect(results.join('').replaceAll('\\', '/')).toMatchSnapshot();
   });
 
   it('Should throw error if threshold is not a number', () => {

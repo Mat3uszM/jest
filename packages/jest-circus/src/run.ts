@@ -15,7 +15,7 @@ import shuffleArray, {
   rngBuilder,
 } from './shuffleArray';
 import {dispatch, getState} from './state';
-import {RETRY_TIMES} from './types';
+import {RETRY_IMMEDIATELY, RETRY_TIMES, WAIT_BEFORE_RETRY} from './types';
 import {
   callAsyncCircusFn,
   getAllHooksForDescribe,
@@ -23,6 +23,10 @@ import {
   getTestID,
   makeRunResult,
 } from './utils';
+
+// Global values can be overwritten by mocks or tests. We'll capture
+// the original values in the variables before we require any files.
+const {setTimeout} = globalThis;
 
 type ConcurrentTestEntry = Omit<Circus.TestEntry, 'fn'> & {
   fn: Circus.ConcurrentTestFn;
@@ -66,12 +70,41 @@ const _runTestsForDescribeBlock = async (
   // Tests that fail and are retried we run after other tests
   const retryTimes =
     // eslint-disable-next-line no-restricted-globals
-    parseInt((global as Global.Global)[RETRY_TIMES] as string, 10) || 0;
+    Number.parseInt((global as Global.Global)[RETRY_TIMES] as string, 10) || 0;
+
+  const waitBeforeRetry =
+    Number.parseInt(
+      // eslint-disable-next-line no-restricted-globals
+      (global as Global.Global)[WAIT_BEFORE_RETRY] as string,
+      10,
+    ) || 0;
+
+  const retryImmediately: boolean =
+    // eslint-disable-next-line no-restricted-globals
+    ((global as Global.Global)[RETRY_IMMEDIATELY] as any) || false;
+
   const deferredRetryTests = [];
 
   if (rng) {
     describeBlock.children = shuffleArray(describeBlock.children, rng);
   }
+
+  const rerunTest = async (test: Circus.TestEntry) => {
+    let numRetriesAvailable = retryTimes;
+
+    while (numRetriesAvailable > 0 && test.errors.length > 0) {
+      // Clear errors so retries occur
+      await dispatch({name: 'test_retry', test});
+
+      if (waitBeforeRetry > 0) {
+        await new Promise(resolve => setTimeout(resolve, waitBeforeRetry));
+      }
+
+      await _runTest(test, isSkipped);
+      numRetriesAvailable--;
+    }
+  };
+
   for (const child of describeBlock.children) {
     switch (child.type) {
       case 'describeBlock': {
@@ -80,12 +113,22 @@ const _runTestsForDescribeBlock = async (
       }
       case 'test': {
         const hasErrorsBeforeTestRun = child.errors.length > 0;
+        const hasRetryTimes = retryTimes > 0;
         await _runTest(child, isSkipped);
+
+        // If immediate retry is set, we retry the test immediately after the first run
+        if (
+          retryImmediately &&
+          hasErrorsBeforeTestRun === false &&
+          hasRetryTimes
+        ) {
+          await rerunTest(child);
+        }
 
         if (
           hasErrorsBeforeTestRun === false &&
-          retryTimes > 0 &&
-          child.errors.length > 0
+          hasRetryTimes &&
+          !retryImmediately
         ) {
           deferredRetryTests.push(child);
         }
@@ -96,15 +139,7 @@ const _runTestsForDescribeBlock = async (
 
   // Re-run failed tests n-times if configured
   for (const test of deferredRetryTests) {
-    let numRetriesAvailable = retryTimes;
-
-    while (numRetriesAvailable > 0 && test.errors.length > 0) {
-      // Clear errors so retries occur
-      await dispatch({name: 'test_retry', test});
-
-      await _runTest(test, isSkipped);
-      numRetriesAvailable--;
-    }
+    await rerunTest(test);
   }
 
   if (!isSkipped) {
@@ -153,9 +188,9 @@ function startTestsConcurrently(concurrentTests: Array<ConcurrentTestEntry>) {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       promise.catch(() => {});
       test.fn = () => promise;
-    } catch (err) {
+    } catch (error) {
       test.fn = () => {
-        throw err;
+        throw error;
       };
     }
   }

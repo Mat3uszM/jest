@@ -38,13 +38,19 @@ import type {Filter, TestRunData} from './types';
 
 const getTestPaths = async (
   globalConfig: Config.GlobalConfig,
+  projectConfig: Config.ProjectConfig,
   source: SearchSource,
   outputStream: WriteStream,
   changedFiles: ChangedFiles | undefined,
   jestHooks: JestHookEmitter,
   filter?: Filter,
 ) => {
-  const data = await source.getTestPaths(globalConfig, changedFiles, filter);
+  const data = await source.getTestPaths(
+    globalConfig,
+    projectConfig,
+    changedFiles,
+    filter,
+  );
 
   if (data.tests.length === 0 && globalConfig.onlyChanged && data.noSCM) {
     new CustomConsole(outputStream, outputStream).log(
@@ -188,13 +194,14 @@ export default async function runJest({
       const searchSource = searchSources[index];
       const matches = await getTestPaths(
         globalConfig,
+        context.config,
         searchSource,
         outputStream,
         changedFilesPromise && (await changedFilesPromise),
         jestHooks,
         filter,
       );
-      allTests = allTests.concat(matches.tests);
+      allTests = [...allTests, ...matches.tests];
 
       return {context, matches};
     }),
@@ -203,7 +210,7 @@ export default async function runJest({
 
   if (globalConfig.shard) {
     if (typeof sequencer.shard !== 'function') {
-      throw new Error(
+      throw new TypeError(
         `Shard ${globalConfig.shard.shardIndex}/${globalConfig.shard.shardCount} requested, but test sequencer ${Sequencer.name} in ${globalConfig.testSequencer} has no shard method.`,
       );
     }
@@ -213,14 +220,22 @@ export default async function runJest({
   allTests = await sequencer.sort(allTests);
 
   if (globalConfig.listTests) {
-    const testsPaths = Array.from(new Set(allTests.map(test => test.path)));
-    /* eslint-disable no-console */
+    const testsPaths = [...new Set(allTests.map(test => test.path))];
+    let testsListOutput;
+
     if (globalConfig.json) {
-      console.log(JSON.stringify(testsPaths));
+      testsListOutput = JSON.stringify(testsPaths);
     } else {
-      console.log(testsPaths.join('\n'));
+      testsListOutput = testsPaths.join('\n');
     }
-    /* eslint-enable */
+
+    if (globalConfig.outputFile) {
+      const outputFile = path.resolve(process.cwd(), globalConfig.outputFile);
+      fs.writeFileSync(outputFile, testsListOutput, 'utf8');
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(testsListOutput);
+    }
 
     onComplete && onComplete(makeEmptyAggregatedTestResult());
     return;
@@ -274,17 +289,16 @@ export default async function runJest({
     const changedFilesInfo = await changedFilesPromise;
     if (changedFilesInfo.changedFiles) {
       testSchedulerContext.changedFiles = changedFilesInfo.changedFiles;
-      const sourcesRelatedToTestsInChangedFilesArray = (
-        await Promise.all(
-          contexts.map(async (_, index) => {
-            const searchSource = searchSources[index];
+      const relatedFiles = await Promise.all(
+        contexts.map(async (_, index) => {
+          const searchSource = searchSources[index];
 
-            return searchSource.findRelatedSourcesFromTestsInChangedFiles(
-              changedFilesInfo,
-            );
-          }),
-        )
-      ).reduce((total, paths) => total.concat(paths), []);
+          return searchSource.findRelatedSourcesFromTestsInChangedFiles(
+            changedFilesInfo,
+          );
+        }),
+      );
+      const sourcesRelatedToTestsInChangedFilesArray = relatedFiles.flat();
       testSchedulerContext.sourcesRelatedToTestsInChangedFiles = new Set(
         sourcesRelatedToTestsInChangedFilesArray,
       );

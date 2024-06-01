@@ -63,10 +63,12 @@ export type AllowedConfigOptions = Partial<
     | 'onlyFailures'
     | 'reporters'
     | 'testNamePattern'
-    | 'testPathPatterns'
     | 'updateSnapshot'
     | 'verbose'
-  > & {mode: 'watch' | 'watchAll'}
+  > & {
+    mode: 'watch' | 'watchAll';
+    testPathPatterns: Array<string>;
+  }
 >;
 
 export type UpdateConfigCallback = (config?: AllowedConfigOptions) => void;
@@ -81,13 +83,11 @@ export interface WatchPlugin {
     updateConfigAndRun: UpdateConfigCallback,
   ) => Promise<void | boolean>;
 }
-export interface WatchPluginClass {
-  new (options: {
-    config: Record<string, unknown>;
-    stdin: ReadStream;
-    stdout: WriteStream;
-  }): WatchPlugin;
-}
+export type WatchPluginClass = new (options: {
+  config: Record<string, unknown>;
+  stdin: ReadStream;
+  stdout: WriteStream;
+}) => WatchPlugin;
 
 export type ScrollOptions = {
   offset: number;

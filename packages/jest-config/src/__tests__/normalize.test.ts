@@ -74,9 +74,9 @@ it('picks an id based on the rootDir', async () => {
   const rootDir = '/root/path/foo';
   const expected = createHash('sha1')
     .update('/root/path/foo')
-    .update(String(Infinity))
+    .update(String(Number.POSITIVE_INFINITY))
     .digest('hex')
-    .substring(0, 32);
+    .slice(0, 32);
   const {options} = await normalize(
     {
       rootDir,
@@ -1100,7 +1100,7 @@ describe('preset', () => {
     );
 
     const errorMessage = semver.satisfies(process.versions.node, '<19.0.0')
-      ? /Unexpected token } in JSON at position (104|110)[\s\S]* at /
+      ? /Unexpected token } in JSON at position (104|110)[\S\s]* at /
       : 'SyntaxError: Expected double-quoted property name in JSON at position 104';
 
     await expect(
@@ -1119,13 +1119,14 @@ describe('preset', () => {
       '/node_modules/react-native-js-preset/jest-preset.js',
       () => ({
         // @ts-expect-error: Testing runtime error
+        // eslint-disable-next-line unicorn/prefer-prototype-methods
         transform: {}.nonExistingProp.call(),
       }),
       {virtual: true},
     );
 
     const errorMessage = semver.satisfies(process.versions.node, '<16.9.1')
-      ? /TypeError: Cannot read property 'call' of undefined[\s\S]* at /
+      ? /TypeError: Cannot read property 'call' of undefined[\S\s]* at /
       : "TypeError: Cannot read properties of undefined (reading 'call')";
 
     await expect(
@@ -1600,7 +1601,7 @@ describe('testPathPatterns', () => {
   it('defaults to empty', async () => {
     const {options} = await normalize(initialOptions, {} as Config.Argv);
 
-    expect(options.testPathPatterns).toEqual([]);
+    expect(options.testPathPatterns.patterns).toEqual([]);
   });
 
   const cliOptions = [
@@ -1613,14 +1614,14 @@ describe('testPathPatterns', () => {
         const argv = {[opt.property]: ['a/b']} as Config.Argv;
         const {options} = await normalize(initialOptions, argv);
 
-        expect(options.testPathPatterns).toEqual(['a/b']);
+        expect(options.testPathPatterns.patterns).toEqual(['a/b']);
       });
 
       it('ignores invalid regular expressions and logs a warning', async () => {
         const argv = {[opt.property]: ['a(']} as Config.Argv;
         const {options} = await normalize(initialOptions, argv);
 
-        expect(options.testPathPatterns).toEqual([]);
+        expect(options.testPathPatterns.patterns).toEqual([]);
         expect(jest.mocked(console.log).mock.calls[0][0]).toMatchSnapshot();
       });
 
@@ -1628,7 +1629,7 @@ describe('testPathPatterns', () => {
         const argv = {[opt.property]: ['a/b', 'c/d']} as Config.Argv;
         const {options} = await normalize(initialOptions, argv);
 
-        expect(options.testPathPatterns).toEqual(['a/b', 'c/d']);
+        expect(options.testPathPatterns.patterns).toEqual(['a/b', 'c/d']);
       });
     });
   }
@@ -1637,7 +1638,7 @@ describe('testPathPatterns', () => {
     const argv = {_: [1]} as Config.Argv;
     const {options} = await normalize(initialOptions, argv);
 
-    expect(options.testPathPatterns).toEqual(['1']);
+    expect(options.testPathPatterns.patterns).toEqual(['1']);
   });
 
   it('joins multiple --testPathPatterns and <regexForTestFiles>', async () => {
@@ -1645,7 +1646,7 @@ describe('testPathPatterns', () => {
       _: ['a', 'b'],
       testPathPatterns: ['c', 'd'],
     } as Config.Argv);
-    expect(options.testPathPatterns).toEqual(['a', 'b', 'c', 'd']);
+    expect(options.testPathPatterns.patterns).toEqual(['a', 'b', 'c', 'd']);
   });
 
   it('gives precedence to --all', async () => {

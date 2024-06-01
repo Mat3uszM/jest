@@ -126,8 +126,8 @@ describe('jest-each', () => {
             {foo: 'bar'},
             () => {},
             [],
-            Infinity,
-            NaN,
+            Number.POSITIVE_INFINITY,
+            Number.NaN,
           ],
           [
             'world',
@@ -138,13 +138,13 @@ describe('jest-each', () => {
             {baz: 'qux'},
             () => {},
             [],
-            Infinity,
-            NaN,
+            Number.POSITIVE_INFINITY,
+            Number.NaN,
           ],
         ]);
         const testFunction = get(eachObject, keyPath);
         testFunction(
-          'expected string: %% %%s %s %d %s %s %d %j %s %j %d %d %#',
+          'expected string: %% %%s %s %d %s %s %d %j %s %j %d %d %# %$',
           noop,
         );
 
@@ -153,14 +153,14 @@ describe('jest-each', () => {
         expect(globalMock).toHaveBeenCalledWith(
           `expected string: % %s hello 1 null undefined 1.2 ${JSON.stringify({
             foo: 'bar',
-          })} () => {} [] Infinity NaN 0`,
+          })} () => {} [] Infinity NaN 0 1`,
           expectFunction,
           undefined,
         );
         expect(globalMock).toHaveBeenCalledWith(
           `expected string: % %s world 1 null undefined 1.2 ${JSON.stringify({
             baz: 'qux',
-          })} () => {} [] Infinity NaN 1`,
+          })} () => {} [] Infinity NaN 1 2`,
           expectFunction,
           undefined,
         );
@@ -304,8 +304,8 @@ describe('jest-each', () => {
             f: {key: 'foo'},
             g: () => {},
             h: [],
-            i: Infinity,
-            j: NaN,
+            i: Number.POSITIVE_INFINITY,
+            j: Number.NaN,
           },
           {
             a: 'world',
@@ -316,8 +316,8 @@ describe('jest-each', () => {
             f: {key: 'bar'},
             g: () => {},
             h: [],
-            i: Infinity,
-            j: NaN,
+            i: Number.POSITIVE_INFINITY,
+            j: Number.NaN,
           },
         ]);
         const testFunction = get(eachObject, keyPath);

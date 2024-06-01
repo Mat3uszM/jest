@@ -7,6 +7,7 @@
  */
 
 import chalk from 'chalk';
+import {TestPathPatterns} from '@jest/pattern';
 // eslint-disable-next-line import/order
 import {KEYS} from 'jest-watcher';
 
@@ -55,7 +56,7 @@ jest.doMock(
   '../runJest',
   () =>
     function () {
-      const args = Array.from(arguments);
+      const args = [...arguments];
       const [{onComplete}] = args;
       runJestMock.apply(null, args);
 
@@ -68,11 +69,11 @@ jest.doMock(
 
 const watch = require('../watch').default;
 
-const nextTick = () => new Promise(res => process.nextTick(res));
+const nextTick = () => new Promise(resolve => process.nextTick(resolve));
 
 const globalConfig = {
   rootDir: '',
-  testPathPatterns: [],
+  testPathPatterns: new TestPathPatterns([]),
   watch: true,
 };
 
