@@ -526,7 +526,6 @@ export default class Runtime {
               // @ts-expect-error Jest uses @types/node@16. Will be fixed when updated to @types/node@20.11.0
               meta.dirname = path.dirname(modulePath);
 
-              // @ts-expect-error It should not be async. Will be fixed when updated to @types/node@20.11.0
               meta.resolve = (specifier, parent = metaUrl) => {
                 const parentPath = fileURLToPath(parent);
 
@@ -2159,6 +2158,16 @@ export default class Runtime {
       this._explicitShouldMock.set(moduleID, false);
       return jestObject;
     };
+    const unmockModule = (moduleName: string) => {
+      const moduleID = this._resolver.getModuleID(
+        this._virtualModuleMocks,
+        from,
+        moduleName,
+        {conditions: this.esmConditions},
+      );
+      this._explicitShouldMockModule.set(moduleID, false);
+      return jestObject;
+    };
     const deepUnmock = (moduleName: string) => {
       const moduleID = this._resolver.getModuleID(
         this._virtualMocks,
@@ -2414,6 +2423,7 @@ export default class Runtime {
       spyOn,
       unmock,
       unstable_mockModule: mockModule,
+      unstable_unmockModule: unmockModule,
       useFakeTimers,
       useRealTimers,
     };

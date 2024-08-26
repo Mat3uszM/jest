@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-/// <reference lib="ESNext.Disposable" />
+/// <reference lib="ESNext.Disposable" preserve="true" />
 
 /* eslint-disable local/ban-types-eventually, local/prefer-rest-params-eventually */
 
@@ -609,6 +609,10 @@ export class ModuleMocker {
     metadata: MockMetadata<T, 'function'>,
     restore?: () => void,
   ): Mock<T>;
+  private _makeComponent<T>(
+    metadata: MockMetadata<T>,
+    restore?: () => void,
+  ): Record<string, any>;
   /* eslint-enable @typescript-eslint/unified-signatures */
   private _makeComponent<T extends UnknownFunction>(
     metadata: MockMetadata<T>,
@@ -628,11 +632,7 @@ export class ModuleMocker {
     ) {
       return metadata.value;
     } else if (metadata.type === 'function') {
-      const prototype =
-        (metadata.members &&
-          metadata.members.prototype &&
-          metadata.members.prototype.members) ||
-        {};
+      const prototype = metadata.members?.prototype?.members ?? {};
       const prototypeSlots = this._getSlots(prototype);
       // eslint-disable-next-line @typescript-eslint/no-this-alias
       const mocker = this;
@@ -931,9 +931,6 @@ export class ModuleMocker {
       Record<string, any> | Array<unknown> | RegExp | T | Mock | undefined
     >,
   ): Mocked<T> {
-    // metadata not compatible but it's the same type, maybe problem with
-    // overloading of _makeComponent and not _generateMock?
-    // @ts-expect-error - unsure why TSC complains here?
     const mock = this._makeComponent(metadata);
     if (metadata.refID != null) {
       refs[metadata.refID] = mock;

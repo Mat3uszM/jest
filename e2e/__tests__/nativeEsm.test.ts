@@ -7,6 +7,7 @@
 
 import {createRequire} from 'module';
 import {resolve} from 'path';
+import {isNativeError} from 'util/types';
 import {onNodeVersions} from '@jest/test-utils';
 import {extractSummary, runYarnInstall} from '../Utils';
 import runJest, {getConfig} from '../runJest';
@@ -28,7 +29,14 @@ beforeAll(() => {
     const ivm = require('isolated-vm');
     isolatedVmInstalled = ivm != null;
   } catch (error) {
-    console.warn('`isolated-vm` is not installed, skipping tests', error);
+    if (
+      isNativeError(error) &&
+      (error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND'
+    ) {
+      console.warn('`isolated-vm` is not installed, skipping its test');
+    } else {
+      throw error;
+    }
   }
 });
 
@@ -43,6 +51,22 @@ test('runs test with native ESM', () => {
   const {exitCode, stderr, stdout} = runJest(DIR, ['native-esm.test.js'], {
     nodeOptions: '--experimental-vm-modules --no-warnings',
   });
+
+  const {summary} = extractSummary(stderr);
+
+  expect(summary).toMatchSnapshot();
+  expect(stdout).toBe('');
+  expect(exitCode).toBe(0);
+});
+
+test('runs test with native mock ESM', () => {
+  const {exitCode, stderr, stdout} = runJest(
+    DIR,
+    ['native-esm-mocks.test.js'],
+    {
+      nodeOptions: '--experimental-vm-modules --no-warnings',
+    },
+  );
 
   const {summary} = extractSummary(stderr);
 

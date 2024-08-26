@@ -36,12 +36,12 @@
     "eslint-plugin-eslint-comments": "^3.1.2",
     "eslint-plugin-import": "^2.6.0",
     "eslint-plugin-jest": "^28.0.0",
-    "eslint-plugin-jsdoc": "^48.0.0",
+    "eslint-plugin-jsdoc": "^50.0.0",
     "eslint-plugin-local": "link:./.eslintplugin",
     "eslint-plugin-markdown": "^3.0.0",
     "eslint-plugin-prettier": "^5.0.0",
     "eslint-plugin-promise": "^6.1.1",
-    "eslint-plugin-unicorn": "^53.0.0",
+    "eslint-plugin-unicorn": "^55.0.0",
     "execa": "^5.0.0",
     "find-process": "^1.4.1",
     "glob": "^10.3.10",
@@ -78,7 +78,7 @@
     "strip-json-comments": "^3.1.1",
     "tempy": "^1.0.0",
     "ts-node": "^10.5.0",
-    "tstyche": "^2.0.0-beta.1",
+    "tstyche": "^2.0.0",
     "typescript": "^5.0.4",
     "webpack": "^5.68.0",
     "webpack-node-externals": "^3.0.0",
@@ -111,6 +111,7 @@
     "test-leak": "yarn jest -i --detectLeaks --color jest-mock jest-diff jest-repl pretty-format",
     "test-ts": "yarn jest --config jest.config.ts.mjs",
     "test-types": "yarn tstyche",
+    "test-with-type-info": "yarn jest e2e/__tests__/jest.config.ts.test.ts",
     "test": "yarn lint && yarn jest",
     "typecheck": "yarn typecheck:examples && yarn typecheck:tests",
     "typecheck:examples": "tsc -p examples/expect-extend && tsc -p examples/typescript",
@@ -203,5 +204,5 @@
     "psl": "patch:psl@npm:^1.9.0#./.yarn/patches/psl-npm-1.9.0-a546edad1a.patch",
     "ts-node@^10.5.0": "patch:ts-node@npm:^10.5.0#./.yarn/patches/ts-node-npm-10.9.1-6c268be7f4.patch"
   },
-  "packageManager": "yarn@3.8.2"
+  "packageManager": "yarn@3.8.4"
 }
